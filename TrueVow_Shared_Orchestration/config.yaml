@@ -257,6 +257,7 @@ personas:
 # ═══════════════════════════════════════════════
 session:
   startup:
+    - sync_shared_knowledge: python TrueVow_Shared_Orchestration/orchestrator.py sync-memory
     - load_memory: python TrueVow_Shared_Orchestration/orchestrator.py memory-summary
     - list_skills: python TrueVow_Shared_Orchestration/orchestrator.py list
     - check_health: python TrueVow_Shared_Orchestration/orchestrator.py doctor
@@ -265,6 +266,7 @@ session:
     - apply: Read the SKILL.md that dispatch returns and follow it
   post_task:
     - remember: python TrueVow_Shared_Orchestration/memory.py remember <category> "<title>" "<content>" --importance N
+    - push_knowledge: python TrueVow_Shared_Orchestration/orchestrator.py push-memory
     - sync: python TrueVow_Shared_Orchestration/obsidian-bridge.py
 
 # ═══════════════════════════════════════════════

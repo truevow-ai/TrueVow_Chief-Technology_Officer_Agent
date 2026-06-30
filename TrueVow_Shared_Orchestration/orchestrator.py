@@ -2,6 +2,7 @@
 """
 TrueVow Agent Ecosystem Orchestrator v2.1
 Harness-agnostic. Auto-dispatches user intent → skill → persona.
+Multi-developer sync via shared git-tracked memory.db.
 
 Commands:
   python orchestrator.py doctor              Full diagnostic
@@ -12,11 +13,14 @@ Commands:
   python orchestrator.py memory-summary      Memory database stats
   python orchestrator.py sync-obsidian       Sync to Obsidian vault
   python orchestrator.py skill-scan          Security scan skills
+  python orchestrator.py sync-memory         Pull latest shared memory.db from git
+  python orchestrator.py push-memory         Commit + push memory.db to shared repo
 """
 
 import subprocess
 import sys
 import yaml
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -293,6 +297,90 @@ def memory_summary():
 
 
 # ═══════════════════════════════════════════════
+#  MULTI-DEVELOPER SHARED MEMORY SYNC
+# ═══════════════════════════════════════════════
+
+def sync_memory():
+    """Pull latest shared memory.db from git. Run before starting work."""
+    git_dir = ROOT
+    if not (git_dir / ".git").exists():
+        print("Not a git repo. Run: git clone --recursive <repo-url>")
+        return
+
+    print("[sync-memory] Pulling latest shared knowledge...")
+    r = subprocess.run(
+        ["git", "pull", "origin", "master"],
+        cwd=str(git_dir),
+        capture_output=True, text=True, timeout=30
+    )
+    print(r.stdout.strip() or "Already up to date.")
+    if r.stderr and "error" in r.stderr.lower():
+        print(r.stderr)
+
+    # Also pull submodules
+    r2 = subprocess.run(
+        ["git", "submodule", "update", "--init", "--recursive"],
+        cwd=str(git_dir),
+        capture_output=True, text=True, timeout=30
+    )
+    if r2.stdout.strip():
+        print(r2.stdout.strip())
+
+
+def push_memory():
+    """Commit and push memory.db to shared repo after important decisions."""
+    git_dir = ROOT
+    memory_db = git_dir / "TrueVow_Shared_Codebase_Memory" / "memory.db"
+
+    if not (git_dir / ".git").exists():
+        print("Not a git repo. Cannot push shared memory.")
+        return
+
+    if not memory_db.exists():
+        print("memory.db not found.")
+        return
+
+    # Get developer identity
+    who = os.environ.get("TRUEVOW_DEV", "unknown")
+    r = subprocess.run(
+        ["git", "config", "user.name"],
+        cwd=str(git_dir), capture_output=True, text=True, timeout=5
+    )
+    git_user = r.stdout.strip()
+    if git_user:
+        who = git_user
+
+    # Get last memory title from recent entry
+    conn = __import__('sqlite3').connect(str(memory_db))
+    conn.row_factory = __import__('sqlite3').Row
+    row = conn.execute("SELECT title FROM memories ORDER BY updated_at DESC LIMIT 1").fetchone()
+    conn.close()
+    title = row["title"] if row else "shared knowledge update"
+
+    # Stage, commit, push
+    subprocess.run(
+        ["git", "add", "TrueVow_Shared_Codebase_Memory/memory.db"],
+        cwd=str(git_dir), capture_output=True, timeout=10
+    )
+    r = subprocess.run(
+        ["git", "commit", "-m", f"memory({who}): {title}"],
+        cwd=str(git_dir), capture_output=True, text=True, timeout=10
+    )
+    if "nothing to commit" in (r.stdout + r.stderr):
+        print("[push-memory] No changes to push.")
+        return
+
+    print(r.stdout.strip())
+    r = subprocess.run(
+        ["git", "push", "origin", "master"],
+        cwd=str(git_dir), capture_output=True, text=True, timeout=30
+    )
+    print(r.stdout.strip() or "Pushed.")
+    if r.stderr:
+        print(r.stderr.strip())
+
+
+# ═══════════════════════════════════════════════
 #  HELPERS
 # ═══════════════════════════════════════════════
 
@@ -311,6 +399,9 @@ def print_help():
     print("  python orchestrator.py skill-scan          Security scan")
     print("  python orchestrator.py memory-summary      Memory stats")
     print("  python orchestrator.py sync-obsidian       Sync to vault")
+    print("  python orchestrator.py sync-memory         Pull shared memory from git")
+    print("  python orchestrator.py push-memory         Commit + push memory to git")
+    print("  python orchestrator.py dashboard           Live agent dashboard")
 
 
 # ═══════════════════════════════════════════════
@@ -398,6 +489,10 @@ def main():
             print("No agents have checked in yet.")
     elif cmd_name == "monitor":
         run_doctor()
+    elif cmd_name == "sync-memory":
+        sync_memory()
+    elif cmd_name == "push-memory":
+        push_memory()
     elif cmd_name in ("--help", "-h", "help"):
         print_help()
     else:

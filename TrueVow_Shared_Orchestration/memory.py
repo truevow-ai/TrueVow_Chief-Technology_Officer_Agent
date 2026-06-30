@@ -27,6 +27,8 @@ import sqlite3
 import json
 import uuid
 import sys
+import os
+import subprocess
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
@@ -261,6 +263,11 @@ def _get_db():
     return MemoryDatabase(str(db_path))
 
 
+def _get_db_path():
+    root = Path(__file__).resolve().parent.parent
+    return root / "TrueVow_Shared_Codebase_Memory" / "memory.db"
+
+
 def cli_summarize():
     db = _get_db()
     summary = db.get_summary()
@@ -281,15 +288,30 @@ def cli_summarize():
     db.close()
 
 
+def _stage_memory_db():
+    """Auto-stage memory.db after a write so git push-memory can commit it."""
+    try:
+        db_path = _get_db_path()
+        git_dir = db_path.parent.parent
+        if (git_dir / ".git").exists():
+            subprocess.run(
+                ["git", "add", str(db_path.relative_to(git_dir))],
+                cwd=str(git_dir), capture_output=True, timeout=10
+            )
+    except Exception:
+        pass
+
+
 def cli_remember():
     if len(sys.argv) < 5:
-        print("Usage: python memory.py remember <category> <title> <content> [--importance N] [--tags t1,t2]")
+        print("Usage: python memory.py remember <category> <title> <content> [--importance N] [--tags t1,t2] [--who devname]")
         return
     category = sys.argv[2]
     title = sys.argv[3]
     content = sys.argv[4]
     importance = 5
     tags = []
+    source = os.environ.get("TRUEVOW_DEV", "user")
     args = sys.argv[5:]
     i = 0
     while i < len(args):
@@ -297,14 +319,31 @@ def cli_remember():
             importance = int(args[i + 1]); i += 2
         elif args[i] == "--tags" and i + 1 < len(args):
             tags = [t.strip() for t in args[i + 1].split(",")]; i += 2
+        elif args[i] == "--who" and i + 1 < len(args):
+            source = args[i + 1]; i += 2
         else:
             i += 1
 
+    # Try git user.name as fallback for source
+    if source == "user":
+        try:
+            r = subprocess.run(
+                ["git", "config", "user.name"],
+                capture_output=True, text=True, timeout=5
+            )
+            if r.stdout.strip():
+                source = r.stdout.strip()
+        except Exception:
+            pass
+
     db = _get_db()
-    entry = db.create(category=category, title=title, content=content, tags=tags, importance=importance)
+    entry = db.create(category=category, title=title, content=content, tags=tags, importance=importance, source=source)
     print(f"Memory created: {entry['id']}")
-    print(f"  [{entry['category']}] {entry['title']} (importance: {entry['importance']})")
+    print(f"  [{entry['category']}] {entry['title']} (importance: {entry['importance']}, by: {source})")
     db.close()
+
+    # Auto-stage memory.db for shared sync
+    _stage_memory_db()
 
 
 def cli_recall():
