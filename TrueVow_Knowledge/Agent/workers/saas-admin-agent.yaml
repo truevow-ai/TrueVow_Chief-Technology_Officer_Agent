@@ -1,0 +1,37 @@
+name: "saas-admin-agent"
+developer: "ghulam-ghous"
+location: "Islamabad"
+service: "saas-admin"
+port: 3001
+runtime:
+  type: opencode
+skills:
+  - load-service-context
+  - run-vector-search
+  - write-session-log
+  - vault-log
+  - log-blocker
+  - log-task-completion
+permissions:
+  read_env:
+    - "SAAS_ADMIN_DATABASE_URL"
+    - "SAAS_ADMIN_SERVICE_API_KEY"
+    - "PLATFORM_SERVICE_API_KEY"
+  write_paths:
+    - "app/api/"
+    - "lib/"
+    - "components/"
+  can_commit: true
+  can_deploy: true
+  can_delete: false
+memory:
+  session_log: "Session-Logs/live/{date}.jsonl"
+  context_files:
+    - "Cross-Service/truevow-saas-administration-service.md"
+    - "ADRs/"
+lifecycle:
+  max_idle_minutes: 60
+  heartbeat_interval_sec: 300
+  max_retries: 3
+  timeout_minutes: 180
+state: pending

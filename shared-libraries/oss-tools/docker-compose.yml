@@ -1,0 +1,230 @@
+# TrueVow OSS Tool Stack — docker-compose
+# Chatwoot (support) + Mattermost (chat) + Novu (notifications) + PostHog (analytics)
+# All self-hosted, open-source. One docker-compose, all services.
+
+services:
+  # ─── 1. CHATWOOT ─── Open-Source Customer Support Platform
+  # Replaces: TrueVow_First_Line_Support_Service
+  # UI: http://localhost:3007
+  chatwoot-db:
+    image: postgres:16-alpine
+    container_name: truevow-chatwoot-db
+    environment:
+      - POSTGRES_DB=chatwoot
+      - POSTGRES_USER=chatwoot
+      - POSTGRES_PASSWORD=chatwoot_secret
+    volumes:
+      - chatwoot_db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  chatwoot-redis:
+    image: redis:7-alpine
+    container_name: truevow-chatwoot-redis
+    restart: unless-stopped
+
+  chatwoot:
+    image: chatwoot/chatwoot:latest
+    container_name: truevow-chatwoot
+    depends_on:
+      - chatwoot-db
+      - chatwoot-redis
+    ports:
+      - "3007:3000"
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - SECRET_KEY_BASE=replace_with_64_char_random_string
+      - FRONTEND_URL=http://localhost:3007
+      - DEFAULT_LOCALE=en
+      - ENABLE_ACCOUNT_SIGNUP=true
+      - POSTGRES_HOST=chatwoot-db
+      - POSTGRES_USERNAME=chatwoot
+      - POSTGRES_PASSWORD=chatwoot_secret
+      - POSTGRES_DATABASE=chatwoot
+      - REDIS_URL=redis://chatwoot-redis:6379
+      - ACTIVE_STORAGE_SERVICE=local
+      - RAILS_MAX_THREADS=5
+      - MAILER_SENDER_EMAIL=hello@truevow.com
+    volumes:
+      - chatwoot_data:/app/storage
+    restart: unless-stopped
+
+  # ─── 2. MATTERMOST ─── Open-Source Slack Alternative
+  # Replaces: Internal Ops Team Chat
+  # UI: http://localhost:8065
+  mattermost-db:
+    image: postgres:16-alpine
+    container_name: truevow-mattermost-db
+    environment:
+      - POSTGRES_DB=mattermost
+      - POSTGRES_USER=mmuser
+      - POSTGRES_PASSWORD=mmuser_password
+    volumes:
+      - mattermost_db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: truevow-mattermost
+    depends_on:
+      - mattermost-db
+    ports:
+      - "8065:8065"
+    environment:
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://mmuser:mmuser_password@mattermost-db:5432/mattermost?sslmode=disable
+      - MM_SERVICESETTINGS_SITEURL=http://localhost:8065
+      - MM_TEAMSETTINGS_ENABLEOPENSERVER=true
+    volumes:
+      - mattermost_data:/mm/mattermost-data
+      - mattermost_config:/mm/mattermost-config
+      - mattermost_logs:/mm/mattermost-logs
+      - mattermost_plugins:/mm/mattermost-plugins
+    restart: unless-stopped
+
+  # ─── 3. NOVU ─── Open-Source Notification Infrastructure
+  # Replaces: Custom notification code across all services
+  # API: http://localhost:3009  |  UI: http://localhost:4200
+  novu-db:
+    image: mongo:7
+    container_name: truevow-novu-db
+    volumes:
+      - novu_db:/data/db
+    restart: unless-stopped
+
+  novu-redis:
+    image: redis:7-alpine
+    container_name: truevow-novu-redis
+    restart: unless-stopped
+
+  novu-api:
+    image: ghcr.io/novuhq/novu/api:latest
+    container_name: truevow-novu-api
+    depends_on:
+      - novu-db
+      - novu-redis
+    ports:
+      - "3009:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGO_URL=mongodb://novu-db:27017/novu
+      - REDIS_HOST=novu-redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=novu_jwt_secret_replace_me
+      - STORE_ENCRYPTION_KEY=novu_encryption_key_32_chars_
+      - API_ROOT_URL=http://localhost:3009
+      - FRONT_BASE_URL=http://localhost:4200
+      - DISABLE_USER_REGISTRATION=false
+      - S3_LOCAL_STACK=http://localhost:4566
+      - S3_BUCKET_NAME=novu-local
+      - S3_REGION=us-east-1
+    restart: unless-stopped
+
+  novu-worker:
+    image: ghcr.io/novuhq/novu/worker:latest
+    container_name: truevow-novu-worker
+    depends_on:
+      - novu-db
+      - novu-redis
+    environment:
+      - NODE_ENV=production
+      - MONGO_URL=mongodb://novu-db:27017/novu
+      - REDIS_HOST=novu-redis
+      - REDIS_PORT=6379
+      - STORE_ENCRYPTION_KEY=novu_encryption_key_32_chars_
+    restart: unless-stopped
+
+  novu-ws:
+    image: ghcr.io/novuhq/novu/ws:latest
+    container_name: truevow-novu-ws
+    depends_on:
+      - novu-db
+      - novu-redis
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGO_URL=mongodb://novu-db:27017/novu
+      - REDIS_HOST=novu-redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=novu_jwt_secret_replace_me
+    restart: unless-stopped
+
+  novu-web:
+    image: ghcr.io/novuhq/novu/web:latest
+    container_name: truevow-novu-web
+    depends_on:
+      - novu-api
+    ports:
+      - "4200:4200"
+    environment:
+      - REACT_APP_API_URL=http://localhost:3009
+      - REACT_APP_WS_URL=http://localhost:3002
+      - REACT_APP_ENVIRONMENT=production
+    restart: unless-stopped
+
+  # ─── 4. POSTHOG ─── Open-Source Product Analytics
+  # Augments: Platform Analytics Service
+  # UI: http://localhost:8010
+  posthog-db:
+    image: postgres:16-alpine
+    container_name: truevow-posthog-db
+    environment:
+      - POSTGRES_DB=posthog
+      - POSTGRES_USER=posthog
+      - POSTGRES_PASSWORD=posthog_secret
+    volumes:
+      - posthog_db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  posthog-redis:
+    image: redis:7-alpine
+    container_name: truevow-posthog-redis
+    restart: unless-stopped
+
+  posthog-clickhouse:
+    image: clickhouse/clickhouse-server:24.1-alpine
+    container_name: truevow-posthog-clickhouse
+    volumes:
+      - posthog_ch:/var/lib/clickhouse
+    restart: unless-stopped
+
+  posthog:
+    image: posthog/posthog:latest
+    container_name: truevow-posthog
+    depends_on:
+      - posthog-db
+      - posthog-redis
+      - posthog-clickhouse
+    ports:
+      - "8010:8000"
+    environment:
+      - SECRET_KEY=posthog_secret_key_replace_me_please
+      - POSTHOG_DB_HOST=posthog-db
+      - POSTHOG_DB_NAME=posthog
+      - POSTHOG_DB_USER=posthog
+      - POSTHOG_DB_PASSWORD=posthog_secret
+      - POSTHOG_REDIS_HOST=posthog-redis
+      - POSTHOG_REDIS_PORT=6379
+      - CLICKHOUSE_HOST=posthog-clickhouse
+      - CLICKHOUSE_DATABASE=posthog
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_SECURE=false
+      - SITE_URL=http://localhost:8010
+      - IS_BEHIND_PROXY=false
+      - DEBUG=false
+      - SKIP_SERVICE_VERSION_REQUIREMENTS=1
+    restart: unless-stopped
+
+volumes:
+  chatwoot_db:
+  chatwoot_data:
+  mattermost_db:
+  mattermost_data:
+  mattermost_config:
+  mattermost_logs:
+  mattermost_plugins:
+  novu_db:
+  posthog_db:
+  posthog_ch:

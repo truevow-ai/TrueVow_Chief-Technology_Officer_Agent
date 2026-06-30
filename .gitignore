@@ -1,0 +1,75 @@
+# TrueVow CTO Agent Ecosystem
+# Tracks: orchestrator, knowledge vault, memory, shared tools, config
+# Excludes: service repos (they have their own git), secrets, archives
+
+# === SECRETS ===
+.env
+.env.local
+.env.*
+*.env.local.backup.txt
+
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+*.egg-info/
+
+# === NODE ===
+node_modules/
+npm-debug.log*
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# === ARCHIVES ===
+*.zip
+*.tar.gz
+
+# === LOGS ===
+*.log
+reindex-stderr.log
+reindex-stdout.log
+reindex.log
+
+# === SIMLINKS ===
+SIMLINKS/
+
+# === WEBSITE ===
+2025_TrueVow_Website/
+
+# === SERVICE REPOS (each has its own git) ===
+TrueVow_Tenant_Application_Service/
+TrueVow_Sales_Ops_Service/
+TrueVow_Financial_Management_Service/
+TrueVow_SaaS_Administration_Service/
+TrueVow_Customer_Success_CORE_Service/
+TrueVow_First_Line_Support_Service/
+TrueVow_Internal_Ops_Service/
+TrueVow_Platform_Analytics_Service/
+TrueVow_Tenant_CONNECT_Service/
+Truevow_Tenant_Customer_Portal_Service/
+TrueVow_Tenant_LEVERAGE_Service/
+TrueVow_Tenant_SETTLE-Service/
+TrueVow_Tenant_VERIFY_Service/
+TrueVow_TWIML_SoftPhone_App/
+TrueVow-Tenant_Billing-Service/
+TrueVow-Documentation/
+TrueVow_Documentation/
+
+# === SUB-REPOS (will be git submodules) ===
+# TrueVow_Shared_Agent_Tools/* are external git clones — added as submodules
+
+# === OBSIDIAN ===
+TrueVow_Knowledge/.obsidian/workspace.json
+TrueVow_Knowledge/.obsidian/workspace-mobile.json
+TrueVow_Knowledge/.sync-state.json
+TrueVow_Knowledge/.triage.yaml
+
+# === SESSION FILES ===
+SESSION_SUMMARY_*.md
+ORCHESTRATOR_PROGRESS.md

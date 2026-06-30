@@ -1,0 +1,19 @@
+{
+  "name": "@truevow/knowledge-sync",
+  "version": "1.0.0",
+  "description": "CLI tool to scan TrueVow service repos and sync metadata into the TrueVow_Knowledge Obsidian vault",
+  "main": "dist/index.js",
+  "bin": {
+    "knowledge-sync": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "sync": "tsx src/index.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0"
+  }
+}

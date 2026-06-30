@@ -1,0 +1,12 @@
+[submodule "TrueVow_Shared_Agent_Tools/agent-skills"]
+	path = TrueVow_Shared_Agent_Tools/agent-skills
+	url = https://github.com/addyosmani/agent-skills.git
+[submodule "TrueVow_Shared_Agent_Tools/agent-reach"]
+	path = TrueVow_Shared_Agent_Tools/agent-reach
+	url = https://github.com/Panniantong/Agent-Reach.git
+[submodule "TrueVow_Shared_Agent_Tools/skillspector"]
+	path = TrueVow_Shared_Agent_Tools/skillspector
+	url = https://github.com/NVIDIA/SkillSpector.git
+[submodule "TrueVow_Shared_Agent_Tools/codebase-memory"]
+	path = TrueVow_Shared_Agent_Tools/codebase-memory
+	url = https://github.com/yuga-hashimoto/codebase-memory.git

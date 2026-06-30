@@ -1,0 +1,583 @@
+# TrueVow Agent Ecosystem - Master Configuration
+# Harness-agnostic. Pure file-based + CLI. No MCP.
+# This is the single source of truth for the entire ecosystem.
+
+ecosystem:
+  name: TrueVow Agent Ecosystem
+  version: 2.1.0
+  principle: "Skills are the new apps. Agents read SKILL.md files. Memory is SQLite. Everything is a file."
+
+# ═══════════════════════════════════════════════
+# INTENT → SKILL → PERSONA DISPATCH TABLE
+# This wires keywords your agent types → the right skill to load
+# ═══════════════════════════════════════════════
+dispatch:
+  # ── META ──
+  - intent: [start session, begin, what skills, help, how to, available skills]
+    skill: using-agent-skills
+    action: dispatching
+
+  # ── DEFINE: Understanding what to build ──
+  - intent: [spec, specification, requirements, prd, define, what to build, feature request, new feature, new project]
+    skill: spec-driven-development
+    phase: define
+  - intent: [interview, stakeholder, questions, clarify, gather requirements, discovery]
+    skill: interview-me
+    phase: define
+  - intent: [brainstorm, ideas, refine idea, explore options, should i, alternatives, concept]
+    skill: idea-refine
+    phase: define
+
+  # ── PLAN: Breaking it down ──
+  - intent: [plan, planning, breakdown, tasks, roadmap, steps, decompose, subtasks, estimate]
+    skill: planning-and-task-breakdown
+    phase: plan
+
+  # ── BUILD: Implementing ──
+  - intent: [implement, build, code, develop, create, add, make, write code]
+    skill: incremental-implementation
+    phase: build
+  - intent: [test driven, tdd, write tests first, red green, prove it, test-first]
+    skill: test-driven-development
+    phase: build
+  - intent: [context, what does this do, explain codebase, understand code, codebase overview]
+    skill: context-engineering
+    phase: build
+  - intent: [docs, documentation, official, source, verify against docs, api reference]
+    skill: source-driven-development
+    phase: build
+  - intent: [doubt, skeptical, adversarial, high stakes, critical, verify again, challenge]
+    skill: doubt-driven-development
+    phase: build
+  - intent: [ui, frontend, component, interface, css, style, layout, design system, react, vue, angular]
+    skill: frontend-ui-engineering
+    phase: build
+  - intent: [api, endpoint, contract, interface design, rest, graphql, grpc, protocol, schema]
+    skill: api-and-interface-design
+    phase: build
+
+  # ── VERIFY: Proving it works ──
+  - intent: [test, testing, write tests, coverage, unit test, integration test, e2e test]
+    skill: test-driven-development
+    phase: verify
+    persona: test-engineer
+  - intent: [browser test, devtools, chrome, playwright, selenium, e2e browser, visual test]
+    skill: browser-testing-with-devtools
+    phase: verify
+  - intent: [bug, broken, not working, error, crash, debug, fix, troubleshooting, issue]
+    skill: debugging-and-error-recovery
+    phase: verify
+
+  # ── REVIEW: Quality gates ──
+  - intent: [review, code review, pr review, pull request, check my code, inspect, audit code]
+    skill: code-review-and-quality
+    phase: review
+    persona: code-reviewer
+  - intent: [simplify, refactor, clean up, complexity, too complex, messy, reduce, shorten]
+    skill: code-simplification
+    phase: review
+  - intent: [security, vulnerability, secure, owasp, exploit, threat, pen test, hardening, safe]
+    skill: security-and-hardening
+    phase: review
+    persona: security-auditor
+  - intent: [performance, slow, optimize, speed, latency, load time, bottleneck, web vitals, lighthouse]
+    skill: performance-optimization
+    phase: review
+    persona: web-performance-auditor
+
+  # ── SHIP: Delivering ──
+  - intent: [git, commit, branch, merge, rebase, version, tag, release]
+    skill: git-workflow-and-versioning
+    phase: ship
+  - intent: [cicd, pipeline, ci, cd, deploy, automation, build system, github actions]
+    skill: ci-cd-and-automation
+    phase: ship
+  - intent: [deprecate, migrate, remove, sunset, old code, legacy, upgrade]
+    skill: deprecation-and-migration
+    phase: ship
+  - intent: [adr, architecture decision, document, readme, wiki, knowledge, record]
+    skill: documentation-and-adrs
+    phase: ship
+  - intent: [observability, logging, metrics, alerting, monitoring, tracing, telemetry]
+    skill: observability-and-instrumentation
+    phase: ship
+  - intent: [ship, launch, deploy, release, production, go live, push to prod]
+    skill: shipping-and-launch
+    phase: ship
+    personas: [code-reviewer, security-auditor, test-engineer]
+
+  # ── FM SERVICE: TrueVow Financial Management (domain-specific) ──
+  - intent: [journal, gl, general ledger, chart of accounts, posting, debit, credit, double entry, accounting period, trial balance]
+    skill: gl-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [invoice, ar, accounts receivable, payment, billing, deferred revenue, revenue recognition, customer billing]
+    skill: ar-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [vendor, ap, accounts payable, vendor bill, benjamin vendor, payment batch, bill payment]
+    skill: ap-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [payroll, salary, wage, employee pay, payroll run, payroll approval, compensation]
+    skill: payroll-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [treasury, bank, cash, fx, forex, settlement, bank account, bank reconciliation, foreign exchange]
+    skill: treasury-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [intercompany, cross entity, royalty, ic reconciliation, inter-entity, ic transfer]
+    skill: intercompany-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [financial report, financial statement, balance sheet, income statement, cash flow, aging report, p&l, profit]
+    skill: reporting-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [affiliate, commission, referral, affiliate payment, partner commission]
+    skill: affiliates-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [benjamin, intake cost, voice ai cost, opex, operational cost, vendor cost, stt, tts, telephony cost]
+    skill: benjamin-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [fm module, financial module, accounting module, fintech pattern, financial pattern, double entry pattern, subledger]
+    skill: fintech-patterns
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [fm search, find in fm, locate in financial, trace in fm, grep financial]
+    skill: search-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [fm build, fm develop, financial code, accounting code, add to financial, modify fm, financial endpoint]
+    skill: code-agent
+    service: TrueVow_Financial_Management_Service
+    phase: build
+  - intent: [fm orchestrate, fm route, financial delegate, accounting delegate, fm dispatch]
+    skill: orchestrator
+    service: TrueVow_Financial_Management_Service
+    phase: build
+
+  # ── TOOL SKILLS ──
+  - intent: [search web, research, look up, find online, google, internet, web search, twitter, reddit, youtube, linkedin, github search, rss, news, bilibili, xiaohongshu]
+    skill: agent-reach
+    tool: agent-reach
+  - intent: [scan skill, check skill, audit skill, verify skill, is this safe, security scan skill]
+    skill: skillspector-guardrail
+    tool: skillspector
+
+# ═══════════════════════════════════════════════
+# PILLAR 1: Osmani Agent Skills (24 + 4 personas)
+# ═══════════════════════════════════════════════
+skills:
+  source: TrueVow_Shared_Agent_Tools/agent-skills
+  skill_dir: TrueVow_Shared_Agent_Tools/agent-skills/skills
+  agents_dir: TrueVow_Shared_Agent_Tools/agent-skills/agents
+  references_dir: TrueVow_Shared_Agent_Tools/agent-skills/references
+  hooks_dir: TrueVow_Shared_Agent_Tools/agent-skills/hooks
+  auto_load:
+    - using-agent-skills
+    - spec-driven-development
+    - test-driven-development
+    - code-review-and-quality
+    - security-and-hardening
+  scan_before_load:
+    enabled: true
+    tool: skillspector
+    threshold: 50
+
+# ═══════════════════════════════════════════════
+# PILLAR 2: Codebase Memory (SQLite, no MCP)
+# ═══════════════════════════════════════════════
+memory:
+  engine: sqlite
+  db_path: TrueVow_Shared_Codebase_Memory/memory.db
+  client: TrueVow_Shared_Orchestration/memory.py
+  categories: [architecture, pattern, decision, dependency, convention, bug, context, todo, relationship]
+
+# ═══════════════════════════════════════════════
+# PILLAR 3: Agent Reach (live web eyes)
+# ═══════════════════════════════════════════════
+reach:
+  source: TrueVow_Shared_Agent_Tools/agent-reach
+  skill_file: TrueVow_Shared_Agent_Tools/agent-reach/agent_reach/skill/SKILL_en.md
+  registered_as: agent-reach
+  channels:
+    active: [v2ex, rss, web, bilibili]
+    zero_config: [github, exa_search, youtube]
+
+# ═══════════════════════════════════════════════
+# PILLAR 4: SkillSpector (NVIDIA security)
+# ═══════════════════════════════════════════════
+security:
+  source: TrueVow_Shared_Agent_Tools/skillspector
+  registered_as: skillspector-guardrail
+  threshold: 50
+  baseline_file: .skillspector-baseline.yaml
+
+# ═══════════════════════════════════════════════
+# PILLAR 5: Obsidian Knowledge Vault
+# ═══════════════════════════════════════════════
+knowledge:
+  vault: TrueVow_Knowledge
+  structure:
+    skills: Skills
+    agents: Agent
+    decisions: Decisions
+    code_maps: Code-Maps
+    sessions: Session-Logs
+    incidents: Incidents
+    projects: Projects
+
+# ═══════════════════════════════════════════════
+# PERSONAS (loaded on matching intent)
+# ═══════════════════════════════════════════════
+personas:
+  code-reviewer:
+    file: TrueVow_Shared_Agent_Tools/agent-skills/agents/code-reviewer.md
+    description: Senior Staff Engineer — five-axis review (correctness, readability, architecture, security, performance)
+    triggers: [review, code quality, PR review, inspect, audit code, check code]
+  test-engineer:
+    file: TrueVow_Shared_Agent_Tools/agent-skills/agents/test-engineer.md
+    description: QA Specialist — test strategy, Prove-It pattern, coverage analysis
+    triggers: [test, testing, qa, coverage, write tests, prove it, verify]
+  security-auditor:
+    file: TrueVow_Shared_Agent_Tools/agent-skills/agents/security-auditor.md
+    description: Security Engineer — OWASP, injection detection, threat modeling, hardening
+    triggers: [security, vulnerability, owasp, exploit, threat, secure, hardening, safe]
+  web-performance-auditor:
+    file: TrueVow_Shared_Agent_Tools/agent-skills/agents/web-performance-auditor.md
+    description: Web Perf Engineer — Core Web Vitals, Lighthouse, rendering anti-patterns
+    triggers: [performance, slow, speed, latency, web vitals, lighthouse, optimize, bottleneck]
+
+# ═══════════════════════════════════════════════
+# SESSION WORKFLOW (what every agent does on start)
+# ═══════════════════════════════════════════════
+session:
+  startup:
+    - load_memory: python TrueVow_Shared_Orchestration/orchestrator.py memory-summary
+    - list_skills: python TrueVow_Shared_Orchestration/orchestrator.py list
+    - check_health: python TrueVow_Shared_Orchestration/orchestrator.py doctor
+  pre_task:
+    - dispatch: python TrueVow_Shared_Orchestration/orchestrator.py dispatch "<user request>"
+    - apply: Read the SKILL.md that dispatch returns and follow it
+  post_task:
+    - remember: python TrueVow_Shared_Orchestration/memory.py remember <category> "<title>" "<content>" --importance N
+    - sync: python TrueVow_Shared_Orchestration/obsidian-bridge.py
+
+# ═══════════════════════════════════════════════
+# ALL REGISTERED AGENTS (skills + personas + tools)
+# ═══════════════════════════════════════════════
+agents:
+  personas:
+    - code-reviewer
+    - test-engineer
+    - security-auditor
+    - web-performance-auditor
+  tool_skills:
+    - agent-reach
+    - skillspector-guardrail
+  lifecycle_skills: 24    # the 24 Osmani SKILL.md files
+
+# ═══════════════════════════════════════════════
+# SERVICES (registered applications using the ecosystem)
+# ═══════════════════════════════════════════════
+services:
+  # ── FINANCIAL MANAGEMENT ──
+  TrueVow_Financial_Management_Service:
+    path: TrueVow_Financial_Management_Service
+    skills_dir: .opencode/skills
+    type: financial-backend
+    stack: [python-fastapi, nextjs, postgresql, alembic]
+    skills:
+      - name: orchestrator
+        description: Master orchestrator for TrueVow FM — architecture, delegation, skill maintenance
+      - name: search-agent
+        description: Find code, trace dependencies, locate patterns in FM
+      - name: code-agent
+        description: Write/modify FM code following established patterns
+      - name: gl-agent
+        description: General Ledger — journal entries, chart of accounts, periods, reconciliation
+      - name: ar-agent
+        description: Accounts Receivable — invoices, payments, deferred revenue, billing sync
+      - name: ap-agent
+        description: Accounts Payable — vendor bills, payments, Benjamin vendor management
+      - name: payroll-agent
+        description: Payroll runs, approvals, payment batches
+      - name: treasury-agent
+        description: Bank accounts, transactions, FX, settlements, reconciliation
+      - name: intercompany-agent
+        description: Cross-entity transactions, royalties, IC reconciliation
+      - name: reporting-agent
+        description: Financial statements, trial balance, aging, cash flow
+      - name: affiliates-agent
+        description: Commission tracking and payments
+      - name: benjamin-agent
+        description: Benjamin INTAKE vendor costs, budget vs actuals, INTAKE OpEx
+      - name: fintech-patterns
+        description: TrueVow FM domain patterns (RLS, double-entry, adapters)
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [alembic upgrade head, python -m pytest tests/ -v, ruff check ., mypy .]
+      frontend: [pnpm install, pnpm lint, pnpm typecheck, pnpm build]
+
+  # ── SaaS ADMINISTRATION (INTERNAL MDM) ──
+  TrueVow_SaaS_Administration_Service:
+    path: TrueVow_SaaS_Administration_Service
+    skills_dir: .opencode/skills
+    type: internal-mdm
+    stack: [nextjs, typescript, postgresql, supabase]
+    description: Master Data Management for all internal services. Accessed only by management and CSM. NOT customer-facing.
+    skills:
+      - name: architect-mode
+        description: Plans features, validates against architecture, creates implementation specs
+      - name: coder-mode
+        description: Implements planned tasks following established patterns and conventions
+      - name: qa-mode
+        description: Runs truth commands, verifies builds, commits when all checks pass
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      frontend: [pnpm install, pnpm typecheck, pnpm lint, pnpm build, npx jest --testPathPatterns=tests/]
+
+  # ── SALES OPS ──
+  TrueVow_Sales_Ops_Service:
+    path: TrueVow_Sales_Ops_Service
+    skills_dir: .opencode/skills
+    type: crm
+    stack: [nextjs, typescript, postgresql, supabase]
+    skills:
+      - name: sales-architect
+        description: Plans CRM features, validates against architecture, creates implementation specs
+      - name: sales-coder
+        description: Implements CRM tasks following established patterns
+      - name: sales-qa
+        description: Runs truth commands, verifies builds and tests, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      frontend: [npm run lint, npm run typecheck, npm run build, npm test]
+
+  # ── TENANT APPLICATION ──
+  TrueVow_Tenant_Application_Service:
+    path: TrueVow_Tenant_Application_Service
+    skills_dir: .opencode/skills
+    type: core-platform
+    stack: [python-fastapi, cloudflare-workers, postgresql, docker]
+    skills:
+      - name: architect
+        description: Plans features, validates against architecture, creates implementation plans
+      - name: builder
+        description: Implements tasks following established patterns and conventions
+      - name: qa
+        description: Runs truth commands, verifies tests, commits when green
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+
+  # ── CUSTOMER PORTAL ──
+  Truevow_Tenant_Customer_Portal_Service:
+    path: Truevow_Tenant_Customer_Portal_Service
+    skills_dir: .opencode/skills
+    type: customer-portal
+    stack: [nextjs, typescript, playwright, sentry]
+    skills:
+      - name: phase-2-advanced-filters
+        description: Advanced filtering capabilities for carrier and compliance data
+      - name: phase-2-carrier-patterns
+        description: Carrier-specific UI patterns and data display
+      - name: phase-2-confidence-score
+        description: Confidence scoring UX and visualization components
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      frontend: [npm run lint, npm run typecheck, npm run build, npx playwright test]
+
+  # ── SETTLE ──
+  TrueVow_Tenant_SETTLE-Service:
+    path: TrueVow_Tenant_SETTLE-Service
+    skills_dir: .opencode/skills
+    type: settlement-engine
+    stack: [python, nextjs, postgresql, alembic, docker]
+    skills:
+      - name: architect
+        description: Plans settlement features, validates against architecture
+      - name: architecture-kb
+        description: Architecture knowledge base — patterns, decisions, reference
+      - name: coder
+        description: Implements settlement tasks following established patterns
+      - name: cross-workspace-shipping
+        description: Cross-workspace shipping and deployment orchestration
+      - name: govdata
+        description: Government data integration (BLS, SSA, CMS, Census, BEA)
+      - name: insurance-carriers
+        description: Insurance carrier integration patterns
+      - name: lead-dev-playbook
+        description: Lead developer playbook — conventions, guardrails, workflows
+      - name: qa
+        description: Runs truth commands, verifies tests and builds, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+      frontend: [npm run lint, npm run build]
+
+  # ── LEVERAGE ──
+  TrueVow_Tenant_LEVERAGE_Service:
+    path: TrueVow_Tenant_LEVERAGE_Service
+    skills_dir: .opencode/skills
+    type: rules-engine
+    stack: [python-fastapi, nextjs, postgresql, alembic]
+    skills:
+      - name: leverage-architect
+        description: Plans rules engine features, validates against architecture
+      - name: leverage-coder
+        description: Implements rules engine tasks following established patterns
+      - name: leverage-qa
+        description: Runs truth commands, verifies tests, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+      frontend: [npm run lint, npm run build]
+
+  # ── VERIFY ──
+  TrueVow_Tenant_VERIFY_Service:
+    path: TrueVow_Tenant_VERIFY_Service
+    skills_dir: .opencode/skills
+    type: blockchain-verification
+    stack: [python, fastapi, blockchain]
+    skills:
+      - name: verify-architect
+        description: Plans blockchain verification features, validates against architecture
+      - name: verify-coder
+        description: Implements blockchain verification tasks following established patterns
+      - name: verify-qa
+        description: Runs truth commands, verifies tests, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+
+  # ── CUSTOMER SUCCESS CORE ──
+  TrueVow_Customer_Success_CORE_Service:
+    path: TrueVow_Customer_Success_CORE_Service
+    skills_dir: .opencode/skills
+    type: customer-success
+    stack: [nextjs, typescript, postgresql, supabase]
+    skills:
+      - name: cs-architect
+        description: Plans customer success features, validates against architecture
+      - name: cs-coder
+        description: Implements customer success tasks following established patterns
+      - name: cs-qa
+        description: Runs truth commands, verifies tests and builds, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      frontend: [npm run lint, npm run typecheck, npm run build, npm test]
+
+  # ── INTERNAL OPS ──
+  TrueVow_Internal_Ops_Service:
+    path: TrueVow_Internal_Ops_Service
+    skills_dir: .opencode/skills
+    type: internal-operations
+    stack: [python-fastapi, nextjs, elk, docker]
+    skills:
+      - name: ops-architect
+        description: Plans internal ops features, validates against architecture
+      - name: ops-coder
+        description: Implements internal ops tasks following established patterns
+      - name: ops-qa
+        description: Runs truth commands, verifies tests and builds, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+      frontend: [npm run lint, npm run build]
+
+  # ── PLATFORM ANALYTICS ──
+  TrueVow_Platform_Analytics_Service:
+    path: TrueVow_Platform_Analytics_Service
+    skills_dir: .opencode/skills
+    type: analytics
+    stack: [python, fastapi]
+    skills:
+      - name: dashboard-api
+        description: Analytics dashboard API endpoints and data aggregation
+      - name: event-ingestion
+        description: Event ingestion pipeline and data processing
+      - name: reporting
+        description: Analytics reporting, exports, and visualization data
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+
+  # ── BILLING ──
+  TrueVow-Tenant_Billing-Service:
+    path: TrueVow-Tenant_Billing-Service
+    skills_dir: .opencode/skills
+    type: billing
+    stack: [python, nextjs, postgresql, alembic]
+    skills:
+      - name: billing-architect
+        description: Plans billing features, validates against architecture
+      - name: billing-coder
+        description: Implements billing tasks following established patterns
+      - name: billing-qa
+        description: Runs truth commands, verifies tests and builds, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+      frontend: [npm run lint, npm run build]
+
+  # ── TWIML SOFTPHONE ──
+  TrueVow_TWIML_SoftPhone_App:
+    path: TrueVow_TWIML_SoftPhone_App
+    skills_dir: .opencode/skills
+    type: voice-agent
+    stack: [python, flask, twilio]
+    skills:
+      - name: softphone-architect
+        description: Plans softphone features, validates against voice architecture
+      - name: softphone-coder
+        description: Implements softphone tasks following established patterns
+      - name: softphone-qa
+        description: Runs truth commands, verifies tests, commits
+    rules:
+      - AGENTS.md
+      - .opencode/skills/**/SKILL.md
+    truth_commands:
+      backend: [python -m pytest tests/ -v, ruff check ., mypy .]
+
+  # ── ARCHIVED ──
+  TrueVow_Tenant_CONNECT_Service:
+    path: TrueVow_Tenant_CONNECT_Service
+    status: archived
+    archived_date: 2026-06
+    note: Decommissioned. All agent wiring removed. Preserved for historical reference.
+
+  TrueVow_First_Line_Support_Service:
+    path: TrueVow_First_Line_Support_Service
+    status: replaced
+    replaced_by: Chatwoot
+    replaced_date: 2026-06
+    note: Replaced by Chatwoot. Preserved for historical reference.
