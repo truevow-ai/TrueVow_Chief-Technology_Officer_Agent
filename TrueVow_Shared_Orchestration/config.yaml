@@ -168,6 +168,61 @@ dispatch:
     skill: skillspector-guardrail
     tool: skillspector
 
+  # ── PHASE 5: SERVICE-ROUTED AGENT DISPATCH ──
+  # When a task directly references a service, load its agent harness
+  - intent: [intake, voice, bridge, twilio, cartesia, stt, tts, telephony, call]
+    service: TrueVow_Tenant_Application_Service
+    agent: intake-agent
+    phase: build
+  - intent: [leverage, draft, rules, legal template, compliance validation]
+    service: TrueVow_Tenant_LEVERAGE_Service
+    agent: leverage-agent
+    phase: build
+  - intent: [verify, blockchain, certification, tamper, attestation]
+    service: TrueVow_Tenant_VERIFY_Service
+    agent: verify-agent
+    phase: build
+  - intent: [settle, settlement, damages, government, BLS, SSA, CMS, insurance, carrier, actuarial]
+    service: TrueVow_Tenant_SETTLE-Service
+    agent: settle-agent
+    phase: build
+  - intent: [accounting, finance, ledger, journal, GL, AR, AP, payroll, treasury, double-entry]
+    service: TrueVow_Financial_Management_Service
+    agent: financial-agent
+    phase: build
+  - intent: [billing, invoice, subscription, charge, pricing plan]
+    service: TrueVow-Tenant_Billing-Service
+    agent: billing-agent
+    phase: build
+  - intent: [saas, admin, MDM, tenant management, provisioning, platform config, credential]
+    service: TrueVow_SaaS_Administration_Service
+    agent: saas-admin-agent
+    phase: build
+  - intent: [portal, customer, client dashboard, self-service]
+    service: Truevow_Tenant_Customer_Portal_Service
+    agent: portal-agent
+    phase: build
+  - intent: [CSM, customer success, support ticket, client relationship, health score, churn]
+    service: TrueVow_Customer_Success_CORE_Service
+    agent: csm-agent
+    phase: build
+  - intent: [sales, lead, pipeline, CRM, scrape lead, enrich lead, classify lead, cohort]
+    service: TrueVow_Sales_Ops_Service
+    agent: sales-agent
+    phase: build
+  - intent: [internal ops, mattermost, novu, chatwoot, task management, time tracking]
+    service: TrueVow_Internal_Ops_Service
+    agent: internal-ops-agent
+    phase: build
+  - intent: [analytics, dashboard, metrics, reporting, events]
+    service: TrueVow_Platform_Analytics_Service
+    agent: analytics-agent
+    phase: build
+  - intent: [softphone, twiml, phone, voice agent, SIP, call routing]
+    service: TrueVow_TWIML_SoftPhone_App
+    agent: softphone-agent
+    phase: build
+
 # ═══════════════════════════════════════════════
 # PILLAR 1: Osmani Agent Skills (24 + 4 personas)
 # ═══════════════════════════════════════════════
@@ -569,13 +624,6 @@ services:
       - .opencode/skills/**/SKILL.md
     truth_commands:
       backend: [python -m pytest tests/ -v, ruff check ., mypy .]
-
-  # ── ARCHIVED ──
-  TrueVow_Tenant_CONNECT_Service:
-    path: TrueVow_Tenant_CONNECT_Service
-    status: archived
-    archived_date: 2026-06
-    note: Decommissioned. All agent wiring removed. Preserved for historical reference.
 
   TrueVow_First_Line_Support_Service:
     path: TrueVow_First_Line_Support_Service

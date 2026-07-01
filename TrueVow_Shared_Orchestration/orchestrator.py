@@ -244,6 +244,18 @@ def list_all():
             print(f"    Skills: {loaded}/{skills_count} loaded  |  Rules: {', '.join(svc.get('rules', []))}")
         print()
 
+    # 7. Agent Team (Phase 5)
+    agent_file = ROOT / "TrueVow_Knowledge" / "Agent" / "workers" / "phase5-agent-team.yaml"
+    if agent_file.exists():
+        agent_cfg = yaml.safe_load(agent_file.read_text(encoding="utf-8"))
+        agents = agent_cfg.get("agents", [])
+        print(f"7. AGENT TEAM ({len(agents)} subagents) — Phase 5")
+        for a in agents:
+            owner = a.get("owner", "—")
+            skills_n = len(a.get("skills", []))
+            print(f"  + {a['id']:25s} [{a.get('domain', '')}]  owner={owner}  skills={skills_n}  type={a.get('type', '')}")
+        print()
+
 
 # ═══════════════════════════════════════════════
 #  SKILL: Print a skill's content
@@ -325,6 +337,28 @@ def sync_memory():
     )
     if r2.stdout.strip():
         print(r2.stdout.strip())
+
+
+def _try_reindex():
+    """Attempt to reindex the knowledge vault. Graceful if Node.js not available."""
+    indexer_dir = ROOT / "shared-libraries" / "knowledge-indexer"
+    if not (indexer_dir / "node_modules" / ".package-lock.json").exists() and \
+       not (indexer_dir / "node_modules" / "@xenova").exists():
+        print("[reindex] knowledge-indexer node_modules not found. Run: cd shared-libraries/knowledge-indexer && npm install")
+        return
+
+    print("[reindex] Re-indexing knowledge vault...")
+    r = subprocess.run(
+        ["npx", "tsx", str(indexer_dir / "src" / "index.ts")],
+        cwd=str(indexer_dir),
+        capture_output=True, text=True, timeout=60
+    )
+    if r.returncode == 0:
+        lines = r.stdout.strip().split("\n")
+        summary = lines[-1] if lines else "done"
+        print(f"[reindex] {summary}")
+    else:
+        print(f"[reindex] skipped: {r.stderr.strip()[:100] if r.stderr else 'Node.js or tsx not available'}")
 
 
 def push_memory():
@@ -441,6 +475,10 @@ def main():
         print(r.stdout)
         if r.stderr:
             print(r.stderr)
+        # Auto-reindex after sync (self-improving flywheel)
+        _try_reindex()
+    elif cmd_name == "reindex":
+        _try_reindex()
     elif cmd_name == "agent-checkin":
         from orchestration import reporting
         action = sys.argv[2] if len(sys.argv) > 2 else "status"
