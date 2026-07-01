@@ -436,6 +436,7 @@ def print_help():
     print("  python orchestrator.py sync-memory         Pull shared memory from git")
     print("  python orchestrator.py push-memory         Commit + push memory to git")
     print("  python orchestrator.py dashboard           Live agent dashboard")
+    print("  python orchestrator.py truth-loop <svc>    Self-healing auto-fix loop")
 
 
 # ═══════════════════════════════════════════════
@@ -531,6 +532,23 @@ def main():
         sync_memory()
     elif cmd_name == "push-memory":
         push_memory()
+    elif cmd_name == "truth-loop":
+        svc = sys.argv[2] if len(sys.argv) > 2 else ""
+        max_attempts = 3
+        args = sys.argv[3:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--max-attempts" and i + 1 < len(args):
+                max_attempts = int(args[i + 1]); i += 2
+            elif args[i] == "--all":
+                svc = "--all"; i += 1
+            else:
+                i += 1
+        if svc:
+            loop_args = [sys.executable, str(Path(__file__).parent / "truth-loop.py"), svc, "--max-attempts", str(max_attempts)]
+            r = subprocess.run(loop_args, cwd=str(ROOT), timeout=600)
+        else:
+            print("Usage: python orchestrator.py truth-loop <service-name> [--all] [--max-attempts N]")
     elif cmd_name in ("--help", "-h", "help"):
         print_help()
     else:
