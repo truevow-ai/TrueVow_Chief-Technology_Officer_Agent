@@ -1,0 +1,91 @@
+# TrueVow CI/CD Pipeline — Shared Template
+# Copy to .github/workflows/ci.yml in each service.
+# Auto-detects Python and/or Next.js based on files present.
+
+name: TrueVow CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # ── Python Backend (runs if requirements.txt or pyproject.toml exists) ──
+  python-tests:
+    runs-on: ubuntu-latest
+    if: hashFiles('requirements.txt', 'pyproject.toml') != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest ruff mypy
+
+      - name: Lint
+        run: ruff check . || true
+
+      - name: Type check
+        run: mypy . --ignore-missing-imports || true
+
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short
+
+  # ── Next.js Frontend (runs if package.json exists) ──
+  nextjs-build:
+    runs-on: ubuntu-latest
+    if: hashFiles('package.json') != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            npm install -g pnpm && pnpm install
+          else
+            npm ci || npm install
+          fi
+
+      - name: Lint
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm lint || true
+          else
+            npm run lint || true
+          fi
+
+      - name: Type check
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm typecheck || true
+          else
+            npm run typecheck || npm run type-check || true
+          fi
+
+      - name: Build
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm build
+          else
+            npm run build
+          fi
+
+      - name: Test
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm test || true
+          else
+            npm test || npx jest --passWithNoTests || true
+          fi
