@@ -69,15 +69,11 @@ export class ClerkWrapper {
    */
   async verifyToken(token: string): Promise<AuthResult> {
     try {
-      // Dynamic import to avoid bundling issues in non-Next.js contexts
-      const { createClerkClient } = await import('@clerk/backend')
+      const { verifyToken: clerkVerifyToken } = await import('@clerk/backend')
 
-      const clerk = createClerkClient({
-        publishableKey: this.domainConfig.clerkPublishableKey,
+      const { sub: userId, ...claims } = await clerkVerifyToken(token, {
         secretKey: this.domainConfig.clerkSecretKey,
       })
-
-      const { sub: userId, ...claims } = await clerk.verifyToken(token)
 
       const user: AuthenticatedUser = {
         userId,
