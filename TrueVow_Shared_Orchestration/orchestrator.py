@@ -24,7 +24,9 @@ import os
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Add parent to path so `from orchestration import ...` works from any cwd
+_ORCH_DIR = str(Path(__file__).resolve().parent)
+if _ORCH_DIR not in sys.path:
+    sys.path.insert(0, _ORCH_DIR)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Windows: force UTF-8 for printing SKILL.md files (they contain Unicode)
@@ -289,7 +291,7 @@ def print_skill(name: str):
 # ═══════════════════════════════════════════════
 
 def run_doctor():
-    from orchestration import monitor
+    import monitor
     checks = monitor.run_all_checks()
     monitor.print_summary(checks)
 
@@ -465,7 +467,7 @@ def main():
         else:
             print_skill(sys.argv[2])
     elif cmd_name == "skill-scan":
-        from orchestration.orchestrator import scan_skills
+        from orchestrator import scan_skills
     elif cmd_name == "memory-summary":
         memory_summary()
     elif cmd_name == "sync-obsidian":
@@ -481,7 +483,7 @@ def main():
     elif cmd_name == "reindex":
         _try_reindex()
     elif cmd_name == "agent-checkin":
-        from orchestration import reporting
+        import reporting
         action = sys.argv[2] if len(sys.argv) > 2 else "status"
         message = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
         # Remove --status flag from message
@@ -514,7 +516,7 @@ def main():
         else:
             reporting.checkin(action, message, status_val)
     elif cmd_name == "dashboard":
-        from orchestration import reporting
+        import reporting
         dash = reporting.get_dashboard()
         if dash:
             print("\n=== LIVE AGENT DASHBOARD ===\n")

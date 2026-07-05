@@ -43,7 +43,7 @@ def checkin(action: str, message: str = "", status: str = "ACTIVE"):
       blocked  - Agent is blocked. Provide reason.
       status   - Show current agent status.
     """
-    from orchestration.memory import MemoryDatabase
+    from memory import MemoryDatabase
 
     agent_id = get_agent_id()
     db = MemoryDatabase(str(DB_PATH))
@@ -94,7 +94,7 @@ def checkin(action: str, message: str = "", status: str = "ACTIVE"):
 
 def get_dashboard() -> dict:
     """Build the live agent dashboard from all agent-checkin memories."""
-    from orchestration.memory import MemoryDatabase
+    from memory import MemoryDatabase
     db = MemoryDatabase(str(DB_PATH))
 
     # Get all recent checkins (don't use FTS query - it sorts by rank not date)
