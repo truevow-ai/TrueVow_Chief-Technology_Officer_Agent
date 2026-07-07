@@ -55,6 +55,7 @@ When an agent begins work on this codebase, it should:
 - Run `python TrueVow_Shared_Orchestration/orchestrator.py sync-memory` to pull shared knowledge from all developers
 - Run `python TrueVow_Shared_Orchestration/orchestrator.py memory-summary` to see what the project remembers
 - Run `python TrueVow_Shared_Orchestration/orchestrator.py list` to see available skills
+- Run `python TrueVow_Shared_Orchestration/orchestrator.py scan-services` to get real-time git state of all 13 services
 
 ## 2. Auto-Dispatch: Map Intent → Skill → Persona
 **Before doing any work**, the agent must run:
@@ -100,7 +101,14 @@ This shares your decisions with all other developers via the git-tracked memory.
 - RED → GREEN → REFACTOR → COMMIT
 - Never skip the test
 
-## 7. Review Before Shipping
+## 7. Stay Informed — Realtime Git Scan
+Every hour during your session, re-run the services scan so you always have current state:
+```
+python TrueVow_Shared_Orchestration/orchestrator.py scan-services
+```
+The `doctor` command now includes this automatically.
+
+## 8. Review Before Shipping
 - Five-axis review: correctness, readability, architecture, security, performance
 - Scan skills before installing: `skillspector scan TrueVow_Shared_Agent_Tools/agent-skills/skills/ --recursive`
 
@@ -112,6 +120,7 @@ This shares your decisions with all other developers via the git-tracked memory.
 | `python TrueVow_Shared_Orchestration/orchestrator.py doctor` | Full ecosystem diagnostic |
 | `python TrueVow_Shared_Orchestration/orchestrator.py list` | List all skills + personas |
 | `python TrueVow_Shared_Orchestration/orchestrator.py dispatch "<request>"` | Auto-map intent → skill + load SKILL.md |
+| `python TrueVow_Shared_Orchestration/orchestrator.py scan-services` | Realtime git state of all 13 services |
 | `python TrueVow_Shared_Orchestration/orchestrator.py dashboard` | View all active developers |
 | `python TrueVow_Shared_Orchestration/memory.py summarize` | Memory database summary |
 | `python TrueVow_Shared_Orchestration/memory.py remember <cat> <title> <content>` | Store a memory |

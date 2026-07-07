@@ -108,6 +108,71 @@ def check_obsidian_vault():
     }
 
 
+def check_services_git():
+    """Check git state of all registered services (fast — one log + status per repo)."""
+    import yaml
+    config_path = Path(__file__).parent / "config.yaml"
+    if not config_path.exists():
+        return {"status": "NO_CONFIG", "message": "config.yaml not found"}
+
+    with open(config_path, encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    services = cfg.get("services", {})
+    clean, dirty, missing, errors = 0, 0, 0, 0
+    dirty_details = []
+
+    for svc_name, svc in services.items():
+        if svc.get("status") in ("archived", "replaced"):
+            continue
+
+        svc_path = ROOT / svc["path"]
+        if not svc_path.exists():
+            missing += 1
+            continue
+
+        git_dir = svc_path / ".git"
+        has_git = False
+        if git_dir.exists():
+            has_git = True
+        else:
+            git_check = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=str(svc_path), capture_output=True, text=True, timeout=5
+            )
+            has_git = git_check.returncode == 0
+
+        if not has_git:
+            missing += 1
+            continue
+
+        try:
+            status_r = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=str(svc_path), capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace"
+            )
+            if status_r.stdout.strip():
+                dirty += 1
+                dirty_details.append({
+                    "service": svc_name,
+                    "type": svc.get("type", ""),
+                    "files": min(status_r.stdout.strip().count("\n") + 1, 50),
+                })
+            else:
+                clean += 1
+        except Exception:
+            errors += 1
+
+    return {
+        "status": "CLEAN" if (dirty == 0 and errors == 0) else "DEGRADED",
+        "clean": clean,
+        "dirty": dirty,
+        "missing": missing,
+        "errors": errors,
+        "dirty_details": dirty_details,
+    }
+
+
 def run_all_checks():
     """Run all health checks and return results."""
     checks = {
@@ -117,10 +182,11 @@ def run_all_checks():
         "agent_reach": check_agent_reach(),
         "skillspector": check_skillspector(),
         "obsidian_vault": check_obsidian_vault(),
+        "services_git": check_services_git(),
     }
 
     all_ok = all(
-        v.get("status") in ("OK", "READY", "EMPTY", "NO_CONFIG")
+        v.get("status") in ("OK", "READY", "EMPTY", "NO_CONFIG", "CLEAN")
         for v in checks.values()
         if isinstance(v, dict)
     )
@@ -171,6 +237,19 @@ def print_summary(checks: dict):
             present = len(result.get("directories_present", []))
             missing = len(result.get("directories_missing", []))
             print(f"  {color}[{status}]{RESET} {label}: {present} dirs present" + (f", {missing} missing" if missing else ""))
+        elif name == "services_git":
+            clean = result.get("clean", 0)
+            dirty = result.get("dirty", 0)
+            missing = result.get("missing", 0)
+            errors = result.get("errors", 0)
+            parts = [f"{clean} clean"]
+            if dirty: parts.append(f"{YELLOW}{dirty} dirty{RESET}")
+            if missing: parts.append(f"{RED}{missing} missing{RESET}")
+            if errors: parts.append(f"{RED}{errors} errors{RESET}")
+            print(f"  {color}[{status}]{RESET} {label}: {', '.join(parts)}")
+            if result.get("dirty_details"):
+                for dd in result["dirty_details"][:3]:
+                    print(f"    - {dd['service']} ({dd['files']} uncommitted)")
 
     print()
 

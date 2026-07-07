@@ -15,12 +15,15 @@ Commands:
   python orchestrator.py skill-scan          Security scan skills
   python orchestrator.py sync-memory         Pull latest shared memory.db from git
   python orchestrator.py push-memory         Commit + push memory.db to shared repo
+  python orchestrator.py scan-services [--watch] [--json]  Scan git state of all registered services
 """
 
 import subprocess
 import sys
+import json
 import yaml
 import os
+import time
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -152,6 +155,165 @@ def dispatch(user_request: str):
          "--tags", f"dispatch,{best.get('phase', 'general')},{best['skill']}"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+
+
+# ═══════════════════════════════════════════════
+#  SCAN-SERVICES: Real-time git state of all services
+# ═══════════════════════════════════════════════
+
+def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
+    """
+    Scan git state of all registered services.
+    Returns structured data. Optionally stores in memory.db.
+    """
+    cfg = _load_config()
+    services = cfg.get("services", {})
+    results = {}
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    for svc_name, svc in services.items():
+        if svc.get("status") in ("archived", "replaced"):
+            continue
+
+        svc_path = ROOT / svc["path"]
+        result = {
+            "name": svc_name,
+            "type": svc.get("type", ""),
+            "exists": svc_path.exists(),
+            "path": str(svc_path),
+        }
+
+        if not svc_path.exists():
+            result["status"] = "MISSING"
+            results[svc_name] = result
+            continue
+
+        git_dir = svc_path / ".git"
+        has_git = False
+        if git_dir.exists():
+            has_git = True
+        else:
+            git_check = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=str(svc_path), capture_output=True, text=True, timeout=5
+            )
+            has_git = git_check.returncode == 0
+
+        if not has_git:
+            result["status"] = "NO_GIT"
+            results[svc_name] = result
+            continue
+
+        try:
+            commits = subprocess.run(
+                ["git", "log", "--oneline", "-10", "--format=%h %s"],
+                cwd=str(svc_path), capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace"
+            )
+            latest_commit = commits.stdout.strip().split("\n")[0] if commits.stdout.strip() else ""
+            
+            status_r = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=str(svc_path), capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace"
+            )
+            dirty_files = status_r.stdout.strip().count("\n") + 1 if status_r.stdout.strip() else 0
+
+            branch_r = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(svc_path), capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace"
+            )
+            branch = branch_r.stdout.strip()
+
+            result["status"] = "DIRTY" if dirty_files > 0 else "CLEAN"
+            result["branch"] = branch
+            result["latest_commit"] = latest_commit
+            result["dirty_files"] = dirty_files
+            result["dirty_detail"] = status_r.stdout.strip()[:500] if status_r.stdout.strip() else ""
+        except Exception as e:
+            result["status"] = "ERROR"
+            result["error"] = str(e)
+
+        results[svc_name] = result
+
+    total = len(results)
+    clean = sum(1 for r in results.values() if r.get("status") == "CLEAN")
+    dirty = sum(1 for r in results.values() if r.get("status") == "DIRTY")
+    missing = sum(1 for r in results.values() if r.get("status") in ("MISSING", "NO_GIT"))
+    errors = sum(1 for r in results.values() if r.get("status") == "ERROR")
+
+    summary = {
+        "timestamp": timestamp,
+        "total": total,
+        "clean": clean,
+        "dirty": dirty,
+        "missing": missing,
+        "errors": errors,
+        "overall": "DEGRADED" if (dirty or missing or errors) else "HEALTHY",
+    }
+
+    # Store in memory for historical tracking
+    if store_memory:
+        content = json.dumps({
+            "summary": summary,
+            "services": {k: {
+                "latest_commit": v.get("latest_commit", ""),
+                "status": v.get("status", ""),
+                "dirty_files": v.get("dirty_files", 0),
+            } for k, v in results.items()},
+        }, indent=2)
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).parent / "memory.py"), "remember",
+             "context", f"Git Scan: {timestamp[:19]}",
+             content,
+             "--tags", "git-scan,services,automated",
+             "--importance", "8"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+
+    if json_output:
+        print(json.dumps({"summary": summary, "services": results}, indent=2, ensure_ascii=False))
+    else:
+        _print_scan_report(summary, results)
+
+    return {"summary": summary, "services": results}
+
+
+def _print_scan_report(summary: dict, results: dict):
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    CYAN = "\033[96m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+
+    overall_color = GREEN if summary["overall"] == "HEALTHY" else YELLOW
+    print(f"\n{BOLD}=== SERVICE GIT STATE SCAN ==={RESET}")
+    print(f"Time: {summary['timestamp'][:19]}")
+    print(f"Overall: {overall_color}{summary['overall']}{RESET}")
+    print(f"  {GREEN}{summary['clean']} CLEAN{RESET} | {YELLOW}{summary['dirty']} DIRTY{RESET} | {RED}{summary['missing']} MISSING{RESET} | {RED}{summary['errors']} ERROR{RESET}")
+    print()
+
+    for svc_name, result in results.items():
+        status = result.get("status", "UNKNOWN")
+        if status == "CLEAN":
+            icon = f"{GREEN}[OK]{RESET}"
+        elif status == "DIRTY":
+            icon = f"{YELLOW}[DIRTY]{RESET}"
+        elif status == "ERROR":
+            icon = f"{RED}[ERR]{RESET}"
+        else:
+            icon = f"{RED}[MISS]{RESET}"
+
+        commit = result.get("latest_commit", "")[:80]
+        branch = result.get("branch", "?")
+        dirty_n = result.get("dirty_files", 0)
+        dirty_str = f" ({dirty_n} uncommitted)" if dirty_n else ""
+
+        print(f"  {icon} {CYAN}{svc_name}{RESET} [{result.get('type', '')}]")
+        print(f"     {branch}: {commit}{dirty_str}")
+        if dirty_n and result.get("dirty_detail"):
+            for line in result["dirty_detail"].split("\n")[:5]:
+                print(f"       {YELLOW}{line}{RESET}")
+    print()
 
 
 # ═══════════════════════════════════════════════
@@ -439,6 +601,7 @@ def print_help():
     print("  python orchestrator.py push-memory         Commit + push memory to git")
     print("  python orchestrator.py dashboard           Live agent dashboard")
     print("  python orchestrator.py truth-loop <svc>    Self-healing auto-fix loop")
+    print("  python orchestrator.py scan-services       Git state of all services [--watch] [--json]")
 
 
 # ═══════════════════════════════════════════════
@@ -534,6 +697,25 @@ def main():
         sync_memory()
     elif cmd_name == "push-memory":
         push_memory()
+    elif cmd_name == "scan-services":
+        json_out = "--json" in sys.argv
+        watch = "--watch" in sys.argv
+        if watch:
+            interval = 3600
+            for i, arg in enumerate(sys.argv):
+                if arg == "--interval" and i + 1 < len(sys.argv):
+                    interval = int(sys.argv[i + 1]); break
+            print(f"[scan-services] Watch mode: scanning every {interval}s. Ctrl+C to stop.")
+            try:
+                while True:
+                    scan_services(json_output=json_out)
+                    if json_out:
+                        break
+                    time.sleep(interval)
+            except KeyboardInterrupt:
+                print("\n[scan-services] Stopped.")
+        else:
+            scan_services(json_output=json_out)
     elif cmd_name == "truth-loop":
         svc = sys.argv[2] if len(sys.argv) > 2 else ""
         max_attempts = 3
