@@ -21,13 +21,25 @@ exporters:
     endpoint: jaeger:4317
     tls:
       insecure: true
+  clickhouse:
+    endpoint: tcp://signoz-clickhouse:9000
+    database: signoz_traces
+    traces_table_name: signoz_traces
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    tls:
+      insecure: true
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [debug, otlp/jaeger]
+      exporters: [debug, clickhouse, otlp/jaeger]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]

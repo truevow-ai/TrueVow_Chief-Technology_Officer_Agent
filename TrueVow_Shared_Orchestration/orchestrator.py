@@ -344,8 +344,8 @@ def _parse_incidents() -> dict:
 
 
 def _check_observability() -> dict:
-    """Check if observability stack (Docker) is deployed and if Sentry DSN is configured."""
-    result = {"status": "UNKNOWN", "components": {}, "sentry_dsn": "MISSING"}
+    """Check if observability stack is deployed: Docker containers + OTEL wiring + SigNoz health."""
+    result = {"status": "UNKNOWN", "components": {}, "otel_services": 0}
     
     docker_compose = ROOT / "shared-libraries" / "observability" / "docker-compose.yml"
     if not docker_compose.exists():
@@ -379,32 +379,39 @@ def _check_observability() -> dict:
     except (FileNotFoundError, Exception):
         result["status"] = "DOCKER_NOT_AVAILABLE"
 
-    # Check if ANY service has a real Sentry DSN configured (not the placeholder)
-    dsn_services = 0
+    # Check SigNoz frontend health
+    try:
+        health = subprocess.run(
+            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:3301"],
+            capture_output=True, text=True, timeout=5
+        )
+        if health.stdout.strip() == "200":
+            result["signoz_ui"] = "REACHABLE"
+        else:
+            result["signoz_ui"] = f"HTTP {health.stdout.strip()}"
+    except Exception:
+        result["signoz_ui"] = "NOT_REACHABLE"
+
+    # Count services with OTEL wired (OTEL_EXPORTER_OTLP_ENDPOINT in .env.local)
+    otel_count = 0
     for svc_name, svc in _load_config().get("services", {}).items():
         if svc.get("status") in ("archived", "replaced"):
             continue
         svc_path = ROOT / svc["path"]
         if not svc_path.exists():
             continue
-        env_files = list(svc_path.glob(".env.local")) + list(svc_path.glob(".env"))
-        for env_f in env_files:
+        for env_name in (".env.local", ".env"):
+            env_file = svc_path / env_name
+            if not env_file.exists():
+                continue
             try:
-                content = env_f.read_text(encoding="utf-8", errors="replace")
-                for line in content.split("\n"):
-                    line = line.strip()
-                    if line.startswith("SENTRY_DSN=") and not line.startswith("#"):
-                        val = line.split("=", 1)[1].strip()
-                        if val and val != "<add-your-dsn>" and not val.startswith("<"):
-                            dsn_services += 1
-                            break
+                content = env_file.read_text(encoding="utf-8", errors="replace")
+                if "OTEL_EXPORTER_OTLP_ENDPOINT" in content:
+                    otel_count += 1
+                    break
             except Exception:
                 pass
-
-    if dsn_services > 0:
-        result["sentry_dsn"] = f"CONFIGURED ({dsn_services} services)"
-    elif dsn_services == 0:
-        result["sentry_dsn"] = "MISSING (no real DSN in any service)"
+    result["otel_services"] = otel_count
 
     return result
 
@@ -651,7 +658,8 @@ def scan_services(json_output: bool = False, store_memory: bool = True, detail: 
         "active_services": active_count,
         "status_breakdown": status_counts,
         "observability": observability.get("status", "UNKNOWN"),
-        "sentry_dsn": observability.get("sentry_dsn", "MISSING"),
+        "otel_services": observability.get("otel_services", 0),
+        "signoz_ui": observability.get("signoz_ui", "UNKNOWN"),
         "overall": "DEGRADED" if (dirty or missing or errors or stale_count > 0) else "HEALTHY",
     }
 
@@ -730,10 +738,10 @@ def _print_scan_report(summary: dict, results: dict, kanban: dict = None, incide
 
     # Row 4: Observability
     obs = summary.get("observability", "UNKNOWN")
-    dsn = _check_observability().get("sentry_dsn", "MISSING")
+    otel = summary.get("otel_services", 0)
     obs_color = GREEN if obs == "RUNNING" else YELLOW if obs == "STOPPED" else RED
-    dsn_color = GREEN if "CONFIGURED" in dsn else RED
-    print(f"  {BOLD}Docker{RESET}: {obs_color}{obs}{RESET}  |  {BOLD}Sentry{RESET}: {dsn_color}{dsn}{RESET}")
+    otel_color = GREEN if otel >= 11 else YELLOW if otel > 0 else RED
+    print(f"  {BOLD}Docker{RESET}: {obs_color}{obs}{RESET}  |  {BOLD}OTEL wired{RESET}: {otel_color}{otel}/11{RESET}  |  {BOLD}SigNoz{RESET}: http://localhost:3301")
 
     print()
 

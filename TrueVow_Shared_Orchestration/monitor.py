@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def check_observability():
-    """Check if observability stack is configured and running."""
+    """Check if observability stack is configured and running: Docker + SigNoz + OTEL."""
     import yaml
     docker_compose = ROOT / "shared-libraries" / "observability" / "docker-compose.yml"
     
@@ -64,12 +64,12 @@ def check_observability():
         result["status"] = "DOCKER_NOT_AVAILABLE"
         result["message"] = str(e)[:80]
 
-    # Check Sentry DSN across all services
+    # Check OTEL wiring across all services
     config_path = Path(__file__).parent / "config.yaml"
     if config_path.exists():
         with open(config_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
-        dsn_count = 0
+        otel_count = 0
         for svc_name, svc in cfg.get("services", {}).items():
             if svc.get("status") in ("archived", "replaced"):
                 continue
@@ -82,18 +82,13 @@ def check_observability():
                     continue
                 try:
                     content = env_file.read_text(encoding="utf-8", errors="replace")
-                    for line in content.split("\n"):
-                        line = line.strip()
-                        if line.startswith("SENTRY_DSN=") and not line.startswith("#"):
-                            val = line.split("=", 1)[1].strip()
-                            if val and val != "<add-your-dsn>" and not val.startswith("<"):
-                                dsn_count += 1
-                                break
+                    if "OTEL_EXPORTER_OTLP_ENDPOINT" in content:
+                        otel_count += 1
+                        break
                 except Exception:
                     pass
-        result["sentry_dsn"] = dsn_count
-        result["sentry_status"] = "CONFIGURED" if dsn_count > 0 else "MISSING"
-    
+        result["otel_services"] = otel_count
+
     return result
 
 
@@ -328,9 +323,9 @@ def print_summary(checks: dict):
         elif name == "observability":
             containers = result.get("containers", 0)
             running = result.get("running", 0)
-            sentry = result.get("sentry_status", "UNKNOWN")
+            otel = result.get("otel_services", 0)
             if containers:
-                print(f"  {color}[{status}]{RESET} {label}: Docker {running}/{containers} | Sentry DSN: {GREEN if sentry == 'CONFIGURED' else RED}{sentry}{RESET}")
+                print(f"  {color}[{status}]{RESET} {label}: Docker {running}/{containers} | OTEL wired: {GREEN if otel >= 11 else YELLOW}{otel}/11{RESET}")
             else:
                 print(f"  {color}[{status}]{RESET} {label}: {result.get('message', 'unknown')}")
 

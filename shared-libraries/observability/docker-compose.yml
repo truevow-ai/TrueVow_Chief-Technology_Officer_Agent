@@ -1,10 +1,11 @@
 # TrueVow Platform Observability Stack
-# OpenTelemetry Collector + Jaeger (trace UI) + Sentry (errors)
+# OpenTelemetry Collector + SigNoz (traces, metrics, errors, logs)
 # Start: docker-compose -f shared-libraries/observability/docker-compose.yml up -d
-# Jaeger UI: http://localhost:16686
+# SigNoz UI: http://localhost:3301
+# Jaeger UI: http://localhost:16686 (legacy)
 
 services:
-  # --- OpenTelemetry Collector ---
+  # --- OpenTelemetry Collector (ingests from all TrueVow services) ---
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: truevow-otel-collector
@@ -15,10 +16,47 @@ services:
       - "4317:4317"   # OTLP gRPC
       - "4318:4318"   # OTLP HTTP
     depends_on:
+      - signoz-clickhouse
       - jaeger
     restart: unless-stopped
 
-  # --- Jaeger All-in-One (trace UI) ---
+  # --- SigNoz: ClickHouse (columnar DB for traces/metrics/logs) ---
+  signoz-clickhouse:
+    image: clickhouse/clickhouse-server:24.1-alpine
+    container_name: truevow-signoz-clickhouse
+    volumes:
+      - signoz_clickhouse:/var/lib/clickhouse
+    restart: unless-stopped
+
+  # --- SigNoz: Query Service (API backend) ---
+  signoz-query-service:
+    image: signoz/query-service:latest
+    container_name: truevow-signoz-query
+    command: ["-config=/root/config/prometheus.yml"]
+    ports:
+      - "8080:8080"    # Query API
+    environment:
+      - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://signoz-clickhouse:9000
+    volumes:
+      - ./sigNoz/prometheus.yml:/root/config/prometheus.yml
+      - signoz_query_db:/var/lib/signoz
+    depends_on:
+      - signoz-clickhouse
+    restart: unless-stopped
+
+  # --- SigNoz: Frontend (React UI) ---
+  signoz-frontend:
+    image: signoz/frontend:latest
+    container_name: truevow-signoz-frontend
+    ports:
+      - "3301:3301"
+    environment:
+      - FRONTEND_API_ENDPOINT=http://signoz-query-service:8080
+    depends_on:
+      - signoz-query-service
+    restart: unless-stopped
+
+  # --- Jaeger All-in-One (trace UI fallback) ---
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: truevow-jaeger
@@ -28,3 +66,7 @@ services:
     ports:
       - "16686:16686"  # Jaeger UI
     restart: unless-stopped
+
+volumes:
+  signoz_clickhouse:
+  signoz_query_db:
