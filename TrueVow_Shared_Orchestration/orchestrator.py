@@ -161,6 +161,300 @@ def dispatch(user_request: str):
 #  SCAN-SERVICES: Real-time git state of all services
 # ═══════════════════════════════════════════════
 
+def _get_truth_loop_history() -> dict:
+    """Query memory.db for truth-loop results. Returns {service_name: latest_result}."""
+    import sqlite3
+    db_path = ROOT / "TrueVow_Shared_Codebase_Memory" / "memory.db"
+    if not db_path.exists():
+        return {}
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT content, updated_at FROM memories
+            WHERE tags LIKE '%truth-loop%'
+            ORDER BY updated_at DESC
+            LIMIT 100
+        """).fetchall()
+        conn.close()
+
+        seen = {}
+        for row in rows:
+            try:
+                data = json.loads(row["content"])
+            except (json.JSONDecodeError, TypeError):
+                content = row["content"]
+                parts = content.split(" | ")
+                if len(parts) >= 2:
+                    svc_part = parts[0].replace("Service: ", "").strip()
+                    result_part = parts[1].replace("Result: ", "").strip()
+                    if svc_part not in seen:
+                        seen[svc_part] = {
+                            "result": result_part,
+                            "attempts": 0,
+                            "timestamp": row["updated_at"][:19],
+                        }
+                continue
+
+            svc = data.get("service", data.get("summary", {}).get("total", ""))
+            if not svc:
+                continue
+            if svc not in seen:
+                seen[svc] = {
+                    "result": "GREEN",
+                    "attempts": 0,
+                    "timestamp": row["updated_at"][:19],
+                }
+
+        return seen
+    except Exception:
+        return {}
+
+
+def _parse_kanban_tasks() -> dict:
+    """Parse KANBAN-BOARD.md for tasks mapped to services. Returns {service_name: [tasks]}."""
+    kanban = ROOT / "TrueVow_Knowledge_Orchestrator" / "KANBAN-BOARD.md"
+    if not kanban.exists():
+        return {}
+
+    service_words = {
+        "Tenant App": "TrueVow_Tenant_Application_Service",
+        "tenant app": "TrueVow_Tenant_Application_Service",
+        "Customer Portal": "Truevow_Tenant_Customer_Portal_Service",
+        "customer portal": "Truevow_Tenant_Customer_Portal_Service",
+        "SaaS Admin": "TrueVow_SaaS_Administration_Service",
+        "saas admin": "TrueVow_SaaS_Administration_Service",
+        "SETTLE": "TrueVow_Tenant_SETTLE-Service",
+        "settle": "TrueVow_Tenant_SETTLE-Service",
+        "LEVERAGE": "TrueVow_Tenant_LEVERAGE_Service",
+        "leverage": "TrueVow_Tenant_LEVERAGE_Service",
+        "VERIFY": "TrueVow_Tenant_VERIFY_Service",
+        "verify": "TrueVow_Tenant_VERIFY_Service",
+        "INTAKE": "TrueVow_Tenant_Application_Service",
+        "intake": "TrueVow_Tenant_Application_Service",
+        "Billing": "TrueVow-Tenant_Billing-Service",
+        "billing": "TrueVow-Tenant_Billing-Service",
+        "Financial": "TrueVow_Financial_Management_Service",
+        "financial": "TrueVow_Financial_Management_Service",
+        "Internal Ops": "TrueVow_Internal_Ops_Service",
+        "internal ops": "TrueVow_Internal_Ops_Service",
+        "CSM": "TrueVow_Customer_Success_CORE_Service",
+        "customer success": "TrueVow_Customer_Success_CORE_Service",
+        "Analytics": "TrueVow_Platform_Analytics_Service",
+        "analytics": "TrueVow_Platform_Analytics_Service",
+        "SoftPhone": "TrueVow_TWIML_SoftPhone_App",
+        "TWIML": "TrueVow_TWIML_SoftPhone_App",
+        "Sales Ops": "TrueVow_Sales_Ops_Service",
+        "sales ops": "TrueVow_Sales_Ops_Service",
+    }
+
+    sections = {}
+    try:
+        content = kanban.read_text(encoding="utf-8")
+        current_section = None
+        for line in content.split("\n"):
+            if line.startswith("## "):
+                current_section = line.replace("## ", "").strip()
+                sections[current_section] = []
+            elif current_section and line.strip().startswith("- ["):
+                task = line.strip()
+                sections[current_section].append(task)
+    except Exception:
+        return {}
+
+    tasks_by_service = {}
+    for section_name, tasks in sections.items():
+        status_short = section_name.split(" ")[-1].lower() if " " in section_name else section_name.lower()
+        for task in tasks:
+            assigned_svc = None
+            for keyword, svc_name in service_words.items():
+                if keyword.lower() in task.lower():
+                    assigned_svc = svc_name
+                    break
+            
+            is_done = "[x]" in task
+            task_text = task[6:] if task.startswith("- [") else task
+            
+            task_entry = {
+                "text": task_text[:100],
+                "section": status_short,
+                "done": is_done,
+            }
+
+            if assigned_svc:
+                if assigned_svc not in tasks_by_service:
+                    tasks_by_service[assigned_svc] = {"active": [], "done": [], "blocked": [], "pending": []}
+                if is_done:
+                    tasks_by_service[assigned_svc]["done"].append(task_entry)
+                elif "blocked" in status_short:
+                    tasks_by_service[assigned_svc]["blocked"].append(task_entry)
+                elif "progress" in status_short:
+                    tasks_by_service[assigned_svc]["active"].append(task_entry)
+                else:
+                    tasks_by_service[assigned_svc]["pending"].append(task_entry)
+
+    return tasks_by_service
+
+
+def _parse_incidents() -> dict:
+    """Parse incident files for service references. Returns {service_name: {open: N, resolved: N}}."""
+    incidents_dir = ROOT / "TrueVow_Knowledge_Orchestrator" / "Incidents"
+    if not incidents_dir.exists():
+        return {}
+
+    service_files = {
+        "TrueVow_Tenant_Application_Service": ["tenant app", "intake", "application service"],
+        "Truevow_Tenant_Customer_Portal_Service": ["customer portal"],
+        "TrueVow_SaaS_Administration_Service": ["saas admin", "saaS admin"],
+        "TrueVow_Tenant_SETTLE-Service": ["settle", "settlement"],
+        "TrueVow_Tenant_LEVERAGE_Service": ["leverage"],
+        "TrueVow_Tenant_VERIFY_Service": ["verify"],
+        "TrueVow-Tenant_Billing-Service": ["billing"],
+        "TrueVow_Financial_Management_Service": ["financial"],
+        "TrueVow_Internal_Ops_Service": ["internal ops", "internal operations"],
+        "TrueVow_Customer_Success_CORE_Service": ["customer success", "csm"],
+        "TrueVow_Platform_Analytics_Service": ["platform analytics", "analytics service"],
+        "TrueVow_TWIML_SoftPhone_App": ["softphone", "twiml", "softphone app"],
+        "TrueVow_Sales_Ops_Service": ["sales ops"],
+    }
+
+    incidents = {}
+    try:
+        for f_path in incidents_dir.glob("*.md"):
+            text = f_path.read_text(encoding="utf-8", errors="replace").lower()
+            
+            is_cross_service = any(kw in text for kw in ["cross-service", "ecosystem audit", "every service", "all 13"])
+            if is_cross_service:
+                continue
+
+            resolved = "status: resolved" in text and "status: open" not in text[:200]
+            title = f_path.stem[:80]
+
+            for svc_name, keywords in service_files.items():
+                if any(kw in text for kw in keywords):
+                    if svc_name not in incidents:
+                        incidents[svc_name] = {"open": 0, "resolved": 0, "items": []}
+                    status = "resolved" if resolved else "open"
+                    incidents[svc_name][status] += 1
+                    incidents[svc_name]["items"].append({"title": title, "status": status, "bug": "bug" in f_path.name.lower()})
+    except Exception:
+        pass
+
+    return incidents
+
+
+def _check_observability() -> dict:
+    """Check if observability stack (Docker) is deployed and running."""
+    result = {"status": "UNKNOWN", "components": {}}
+    
+    docker_compose = ROOT / "shared-libraries" / "observability" / "docker-compose.yml"
+    if not docker_compose.exists():
+        result["status"] = "NO_CONFIG"
+        return result
+
+    result["config_exists"] = True
+    
+    try:
+        r = subprocess.run(
+            ["docker", "compose", "-f", str(docker_compose), "ps", "--format", "json"],
+            capture_output=True, text=True, timeout=15
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            containers = []
+            for line in r.stdout.strip().split("\n"):
+                try:
+                    containers.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            
+            running = [c for c in containers if c.get("State") == "running"]
+            result["status"] = "RUNNING" if running else "STOPPED"
+            result["components"] = {
+                "total": len(containers),
+                "running": len(running),
+                "containers": [c.get("Name", c.get("Service", "?")) for c in containers],
+            }
+        else:
+            result["status"] = "NOT_DEPLOYED"
+    except (FileNotFoundError, Exception):
+        result["status"] = "DOCKER_NOT_AVAILABLE"
+
+    return result
+
+
+def _derive_service_status(svc_name: str, svc_type: str, git_status: str, agent_act: dict,
+                           truth_loop: dict, kanban: dict, incidents: dict) -> dict:
+    """Derive a combined operational status for a service."""
+    status = {
+        "overall": "UNKNOWN",
+        "git": git_status,
+        "agent": "stale",
+        "truth_loop": "unknown",
+        "tasks": {"active": 0, "blocked": 0, "pending": 0, "done": 0},
+        "incidents": {"open": 0, "resolved": 0},
+        "badges": [],
+    }
+
+    # Agent recency
+    if agent_act:
+        h = agent_act.get("hours_ago", 999)
+        if h < 1:
+            status["agent"] = "active"
+        elif h < 24:
+            status["agent"] = "recent"
+        else:
+            status["agent"] = "stale"
+    
+    # Truth-loop
+    if svc_name in truth_loop:
+        status["truth_loop"] = truth_loop[svc_name]["result"].lower()
+
+    # Kanban tasks
+    if svc_name in kanban:
+        k = kanban[svc_name]
+        status["tasks"]["active"] = len(k.get("active", []))
+        status["tasks"]["blocked"] = len(k.get("blocked", []))
+        status["tasks"]["pending"] = len(k.get("pending", []))
+        status["tasks"]["done"] = len(k.get("done", []))
+
+    # Incidents
+    if svc_name in incidents:
+        inc = incidents[svc_name]
+        status["incidents"]["open"] = inc.get("open", 0)
+        status["incidents"]["resolved"] = inc.get("resolved", 0)
+
+    # Derive overall status
+    if status["agent"] == "stale" and status["git"] == "DIRTY":
+        status["overall"] = "NEGLECTED"
+        status["badges"].append("[NEGLECTED]")
+    elif status["truth_loop"] == "failed":
+        status["overall"] = "FAILING"
+        status["badges"].append("[FAILING]")
+    elif status["tasks"]["blocked"] > 0:
+        status["overall"] = "BLOCKED"
+        status["badges"].append("[BLOCKED]")
+    elif status["incidents"]["open"] > 0:
+        status["overall"] = "INCIDENT"
+        status["badges"].append("[INCIDENT]")
+    elif status["agent"] == "active" and status["git"] == "CLEAN":
+        status["overall"] = "HEALTHY"
+    elif status["agent"] == "recent":
+        status["overall"] = "ACTIVE"
+    elif status["agent"] == "stale":
+        status["overall"] = "STALE"
+    elif status["git"] == "DIRTY":
+        status["overall"] = "DIRTY"
+    else:
+        status["overall"] = "UNKNOWN"
+
+    if status["tasks"]["active"] > 0:
+        status["badges"].append(f"[{status['tasks']['active']} TASKS]")
+    if status["tasks"]["pending"] > 0:
+        status["badges"].append(f"[{status['tasks']['pending']} PENDING]")
+
+    return status
+
+
 def _get_agent_activity() -> dict:
     """Query memory.db for recent agent check-ins. Returns {agent_id: details}."""
     import sqlite3
@@ -284,15 +578,37 @@ def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
 
     # Agent activity recency check
     agent_activity = _get_agent_activity()
+    truth_loop_data = _get_truth_loop_history()
+    kanban_tasks = _parse_kanban_tasks()
+    incident_data = _parse_incidents()
+    observability = _check_observability()
+
+    status_counts = {"HEALTHY": 0, "ACTIVE": 0, "STALE": 0, "NEGLECTED": 0, "BLOCKED": 0, "FAILING": 0, "INCIDENT": 0, "DIRTY": 0, "UNKNOWN": 0}
     stale_services = []
-    for svc_name in results:
+
+    for svc_name in list(results.keys()):
+        r = results[svc_name]
         act = agent_activity.get(svc_name)
         if act:
-            results[svc_name]["agent_activity"] = act
+            r["agent_activity"] = act
             if act["hours_ago"] > 24:
                 stale_services.append(svc_name)
         else:
             stale_services.append(svc_name)
+
+        derived = _derive_service_status(
+            svc_name, r.get("type", ""), r.get("status", "UNKNOWN"),
+            act, truth_loop_data, kanban_tasks, incident_data
+        )
+        r["derived_status"] = derived["overall"]
+        r["badges"] = derived.get("badges", [])
+        r["tasks"] = derived.get("tasks", {})
+        r["incidents_open"] = derived.get("incidents", {}).get("open", 0)
+        r["truth_loop"] = derived.get("truth_loop", "unknown")
+
+        overall = derived.get("overall", "UNKNOWN")
+        if overall in status_counts:
+            status_counts[overall] += 1
 
     stale_count = len(stale_services)
     active_count = total - stale_count
@@ -306,6 +622,8 @@ def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
         "errors": errors,
         "stale_services": stale_count,
         "active_services": active_count,
+        "status_breakdown": status_counts,
+        "observability": observability.get("status", "UNKNOWN"),
         "overall": "DEGRADED" if (dirty or missing or errors or stale_count > 0) else "HEALTHY",
     }
 
@@ -318,7 +636,12 @@ def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
                 "latest_commit": v.get("latest_commit", ""),
                 "status": v.get("status", ""),
                 "dirty_files": v.get("dirty_files", 0),
+                "derived_status": v.get("derived_status", ""),
+                "badges": v.get("badges", []),
                 "agent_activity": v.get("agent_activity"),
+                "truth_loop": v.get("truth_loop", "unknown"),
+                "incidents_open": v.get("incidents_open", 0),
+                "tasks": v.get("tasks", {}),
             } for k, v in results.items()},
         }, indent=2)
         subprocess.Popen(
@@ -343,51 +666,126 @@ def _print_scan_report(summary: dict, results: dict):
     YELLOW = "\033[93m"
     RED = "\033[91m"
     CYAN = "\033[96m"
+    MAGENTA = "\033[95m"
     BOLD = "\033[1m"
     RESET = "\033[0m"
 
+    sb = summary.get("status_breakdown", {})
+
     overall_color = GREEN if summary["overall"] == "HEALTHY" else YELLOW
-    print(f"\n{BOLD}=== SERVICE GIT STATE SCAN ==={RESET}")
-    print(f"Time: {summary['timestamp'][:19]}")
-    print(f"Overall: {overall_color}{summary['overall']}{RESET}")
-    print(f"  Git: {GREEN}{summary['clean']} CLEAN{RESET} | {YELLOW}{summary['dirty']} DIRTY{RESET} | {RED}{summary['missing']} MISSING{RESET} | {RED}{summary['errors']} ERROR{RESET}")
-    stale_count = summary.get("stale_services", 0)
+    print(f"\n{BOLD}{'='*60}{RESET}")
+    print(f"{BOLD}  TrueVow CTO Dashboard — Service Health Scan{RESET}")
+    print(f"  {summary['timestamp'][:19]}")
+    print(f"  Overall: {overall_color}{summary['overall']}{RESET}")
+    print(f"{BOLD}{'='*60}{RESET}")
+
+    # Row 1: Git state
+    print(f"\n  {BOLD}Git{RESET}: {GREEN}{summary['clean']} clean{RESET} | {YELLOW}{summary['dirty']} dirty{RESET} | {RED}{summary['missing']} missing{RESET} | {RED}{summary['errors']} errors{RESET}")
+
+    # Row 2: Agent activity + stale
     active_count = summary.get("active_services", 0)
-    stale_str = f"{RED}{stale_count} STALE{RESET}" if stale_count > 0 else f"{GREEN}{stale_count} STALE{RESET}"
-    print(f"  Agents: {GREEN}{active_count} active{RESET} | {stale_str} (no check-in >24h)")
+    stale_count = summary.get("stale_services", 0)
+    print(f"  {BOLD}Agents{RESET}: {GREEN}{active_count} active{RESET} | {RED if stale_count > 0 else GREEN}{stale_count} stale{RESET} (>24h no check-in)")
+
+    # Row 3: Derived status counts
+    status_parts = []
+    for s, c in sb.items():
+        if c == 0:
+            continue
+        if s in ("HEALTHY", "ACTIVE"):
+            status_parts.append(f"{GREEN}{c} {s}{RESET}")
+        elif s in ("STALE", "DIRTY"):
+            status_parts.append(f"{YELLOW}{c} {s}{RESET}")
+        else:
+            status_parts.append(f"{RED}{c} {s}{RESET}")
+    print(f"  {BOLD}Status{RESET}: {', '.join(status_parts) if status_parts else 'N/A'}")
+
+    # Row 4: Observability
+    obs = summary.get("observability", "UNKNOWN")
+    obs_color = GREEN if obs == "RUNNING" else YELLOW if obs == "STOPPED" else RED
+    print(f"  {BOLD}Observability{RESET}: {obs_color}{obs}{RESET} (Docker Prometheus+Grafana+Jaeger+Sentry)")
+
     print()
 
-    for svc_name, result in results.items():
-        status = result.get("status", "UNKNOWN")
-        if status == "CLEAN":
-            icon = f"{GREEN}[OK]{RESET}"
-        elif status == "DIRTY":
-            icon = f"{YELLOW}[DIRTY]{RESET}"
-        elif status == "ERROR":
-            icon = f"{RED}[ERR]{RESET}"
-        else:
-            icon = f"{RED}[MISS]{RESET}"
+    # Per-service table
+    print(f"  {BOLD}{'SERVICE':40s} GIT     STATUS     AGENT       TRUTH   TASKS  INCIDENTS{RESET}")
+    print(f"  {'─' * 95}")
 
-        commit = result.get("latest_commit", "")[:80]
-        branch = result.get("branch", "?")
-        dirty_n = result.get("dirty_files", 0)
-        dirty_str = f" ({dirty_n} uncommitted)" if dirty_n else ""
+    for svc_name, result in results.items():
+        git_status = result.get("status", "?")
+        if git_status == "CLEAN":
+            git_col = f"{GREEN}CLEAN {RESET}"
+        elif git_status == "DIRTY":
+            git_col = f"{YELLOW}DIRTY{RESET}"
+        else:
+            git_col = f"{RED}{git_status[:5]:5s}{RESET}"
+
+        derived = result.get("derived_status", "?").upper()
+        if derived == "HEALTHY":
+            status_col = f"{GREEN}{derived:8s}{RESET}"
+        elif derived == "ACTIVE":
+            status_col = f"{GREEN}{derived:8s}{RESET}"
+        elif derived in ("STALE", "DIRTY"):
+            status_col = f"{YELLOW}{derived:8s}{RESET}"
+        else:
+            status_col = f"{RED}{derived:8s}{RESET}"
 
         act = result.get("agent_activity")
         if act:
-            age_h = act["hours_ago"]
-            age_str = f"{age_h:.0f}h ago" if age_h < 24 else f"{RED}{age_h:.0f}h ago{RESET}"
-            act_str = f" [Agent: {act['status']} {age_str}]"
-            if act["message"]:
-                act_str += f" — {act['message'][:60]}"
+            h = act["hours_ago"]
+            if h < 1:
+                agent_col = f"{GREEN}active <1h{RESET}"
+            elif h < 24:
+                agent_col = f"{GREEN}recent {h:.0f}h{RESET}"
+            else:
+                agent_col = f"{RED}stale {h:.0f}h{RESET}"
         else:
-            act_str = f" {RED}[NO AGENT ACTIVITY]{RESET}"
+            agent_col = f"{RED}none{RESET}"
 
-        print(f"  {icon} {CYAN}{svc_name}{RESET} [{result.get('type', '')}]{act_str}")
-        print(f"     {branch}: {commit}{dirty_str}")
-        if dirty_n and result.get("dirty_detail"):
-            for line in result["dirty_detail"].split("\n")[:3]:
-                print(f"       {YELLOW}{line}{RESET}")
+        tl = result.get("truth_loop", "?")
+        if tl == "green":
+            tl_col = f"{GREEN}GREEN{RESET}"
+        elif tl == "failed":
+            tl_col = f"{RED}FAIL{RESET}"
+        else:
+            tl_col = "?"
+
+        tasks = result.get("tasks", {})
+        task_parts = []
+        if tasks.get("active", 0):
+            task_parts.append(f"{GREEN}{tasks['active']}a{RESET}")
+        if tasks.get("blocked", 0):
+            task_parts.append(f"{RED}{tasks['blocked']}b{RESET}")
+        if tasks.get("pending", 0):
+            task_parts.append(f"{YELLOW}{tasks['pending']}p{RESET}")
+        tasks_str = ",".join(task_parts) if task_parts else "-"
+
+        inc_open = result.get("incidents_open", 0)
+        inc_col = f"  {RED}{inc_open} open{RESET}" if inc_open else f"{GREEN}0{RESET}"
+
+        # Truncate name
+        name = svc_name[:38]
+
+        print(f"  {CYAN}{name:38s}{RESET} {git_col}  {status_col}  {agent_col:12s}  {tl_col:6s}  {tasks_str:10s}  {inc_col}")
+
+        # Show additional detail for non-trivial states
+        badges = result.get("badges", [])
+        if badges:
+            badge_str = "  ".join(b for b in badges)
+            print(f"    {MAGENTA}{badge_str}{RESET}")
+
+        act_msg = None
+        if act and act.get("message"):
+            act_msg = act["message"][:80]
+        if act_msg:
+            print(f"    {YELLOW}└─ {act_msg}{RESET}")
+
+        dirty_n = result.get("dirty_files", 0)
+        if dirty_n > 0 and dirty_n <= 20:
+            print(f"    {YELLOW}└─ {dirty_n} uncommitted files{RESET}")
+        elif dirty_n > 20:
+            print(f"    {RED}└─ {dirty_n} uncommitted files (large){RESET}")
+
     print()
 
 

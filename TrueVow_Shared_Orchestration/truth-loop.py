@@ -104,6 +104,8 @@ def truth_loop(service_name: str, max_attempts: int = 3):
     print(f"Max attempts: {max_attempts}")
     print(f"Started: {datetime.now().isoformat()}\n")
 
+    all_fixes = []
+
     for attempt in range(1, max_attempts + 1):
         print(f"--- Attempt {attempt}/{max_attempts} ---")
         results = run_truth_commands(service_name, svc)
@@ -116,13 +118,14 @@ def truth_loop(service_name: str, max_attempts: int = 3):
         if not failed:
             print(f"\n=== ALL GREEN ({attempt} attempt(s)) ===")
             print(f"Finished: {datetime.now().isoformat()}")
-            return {"result": "GREEN", "attempts": attempt, "total_commands": len(results)}
+            final_result = {"result": "GREEN", "attempts": attempt, "total_commands": len(results)}
+            _store_results(service_name, final_result, all_fixes)
+            return final_result
 
         # Show failures
         for f in failed:
             print(f"\n  FAILED: {f['command']}")
             print(f"  Exit code: {f['exit_code']}")
-            # Show last 20 lines of output
             lines = f["output"].strip().split("\n")
             for line in lines[-20:]:
                 print(f"    {line[:200]}")
@@ -131,6 +134,7 @@ def truth_loop(service_name: str, max_attempts: int = 3):
             print(f"\n  [AUTO-FIX] Analyzing failures...")
             fixed = _auto_fix(failed, service_name, svc)
             if fixed:
+                all_fixes.append(f"attempt{attempt}: {fixed} fix(es)")
                 print(f"  Applied {fixed} auto-fix(es). Re-running truth commands...")
             else:
                 print(f"  No auto-fix available. Report to human:")
@@ -139,7 +143,23 @@ def truth_loop(service_name: str, max_attempts: int = 3):
 
     print(f"\n=== STILL FAILING after {max_attempts} attempts ===")
     print(f"Finished: {datetime.now().isoformat()}")
-    return {"result": "FAILED", "attempts": max_attempts, "remaining_failures": len(failed)}
+    final_result = {"result": "FAILED", "attempts": max_attempts, "remaining_failures": len(failed)}
+    _store_results(service_name, final_result, all_fixes)
+    return final_result
+
+
+def _store_results(service_name: str, result: dict, auto_fixes: list):
+    """Store truth-loop results in shared memory.db for dashboard visibility."""
+    try:
+        subprocess.run([
+            sys.executable, str(Path(__file__).parent / "memory.py"), "remember",
+            "context", f"Truth-Loop: {service_name} — {result.get('result', 'UNKNOWN')}",
+            f"Service: {service_name} | Result: {result.get('result', 'UNKNOWN')} | Attempts: {result.get('attempts', 0)} | Commands: {result.get('total_commands', 0)} | Auto-fixes: {auto_fixes}",
+            "--tags", f"truth-loop,{result.get('result', 'UNKNOWN').lower()},{service_name}",
+            "--importance", "8" if result.get("result") == "FAILED" else "6"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+    except Exception:
+        pass
 
 
 def _auto_fix(failed: list[dict], service_name: str, svc: dict) -> int:

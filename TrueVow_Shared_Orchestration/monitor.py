@@ -23,6 +23,40 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def check_observability():
+    """Check if observability stack is configured and running."""
+    docker_compose = ROOT / "shared-libraries" / "observability" / "docker-compose.yml"
+    if not docker_compose.exists():
+        return {"status": "NO_CONFIG", "message": "No observability docker-compose found"}
+
+    try:
+        r = subprocess.run(
+            ["docker", "compose", "-f", str(docker_compose), "ps", "--format", "json"],
+            capture_output=True, text=True, timeout=15
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            running = 0
+            total = 0
+            for line in r.stdout.strip().split("\n"):
+                try:
+                    data = json.loads(line)
+                    total += 1
+                    if data.get("State") == "running":
+                        running += 1
+                except json.JSONDecodeError:
+                    continue
+            if running == total and total > 0:
+                return {"status": "RUNNING", "containers": total, "running": running}
+            elif running > 0:
+                return {"status": "PARTIAL", "containers": total, "running": running}
+            else:
+                return {"status": "STOPPED", "containers": total, "running": 0}
+        else:
+            return {"status": "NOT_DEPLOYED", "message": "docker-compose ps returned no containers"}
+    except (FileNotFoundError, Exception) as e:
+        return {"status": "DOCKER_NOT_AVAILABLE", "message": str(e)[:80]}
+
+
 def check_memory_db():
     """Verify the SQLite memory database is healthy (Python client, no MCP)."""
     db_path = ROOT / "TrueVow_Shared_Codebase_Memory" / "memory.db"
@@ -183,10 +217,11 @@ def run_all_checks():
         "skillspector": check_skillspector(),
         "obsidian_vault": check_obsidian_vault(),
         "services_git": check_services_git(),
+        "observability": check_observability(),
     }
 
     all_ok = all(
-        v.get("status") in ("OK", "READY", "EMPTY", "NO_CONFIG", "CLEAN")
+        v.get("status") in ("OK", "READY", "EMPTY", "NO_CONFIG", "CLEAN", "RUNNING", "NOT_DEPLOYED", "DOCKER_NOT_AVAILABLE")
         for v in checks.values()
         if isinstance(v, dict)
     )
@@ -250,6 +285,13 @@ def print_summary(checks: dict):
             if result.get("dirty_details"):
                 for dd in result["dirty_details"][:3]:
                     print(f"    - {dd['service']} ({dd['files']} uncommitted)")
+        elif name == "observability":
+            containers = result.get("containers", 0)
+            running = result.get("running", 0)
+            if containers:
+                print(f"  {color}[{status}]{RESET} {label}: {running}/{containers} containers running")
+            else:
+                print(f"  {color}[{status}]{RESET} {label}: {result.get('message', 'unknown')}")
 
     print()
 
