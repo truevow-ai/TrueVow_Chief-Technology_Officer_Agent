@@ -25,9 +25,14 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def check_observability():
     """Check if observability stack is configured and running."""
+    import yaml
     docker_compose = ROOT / "shared-libraries" / "observability" / "docker-compose.yml"
+    
+    result = {"status": "NO_CONFIG"}
+
     if not docker_compose.exists():
-        return {"status": "NO_CONFIG", "message": "No observability docker-compose found"}
+        result["message"] = "No observability docker-compose found"
+        return result
 
     try:
         r = subprocess.run(
@@ -46,15 +51,50 @@ def check_observability():
                 except json.JSONDecodeError:
                     continue
             if running == total and total > 0:
-                return {"status": "RUNNING", "containers": total, "running": running}
+                result["status"] = "RUNNING"
             elif running > 0:
-                return {"status": "PARTIAL", "containers": total, "running": running}
+                result["status"] = "PARTIAL"
             else:
-                return {"status": "STOPPED", "containers": total, "running": 0}
+                result["status"] = "STOPPED"
+            result["containers"] = total
+            result["running"] = running
         else:
-            return {"status": "NOT_DEPLOYED", "message": "docker-compose ps returned no containers"}
+            result["status"] = "NOT_DEPLOYED"
     except (FileNotFoundError, Exception) as e:
-        return {"status": "DOCKER_NOT_AVAILABLE", "message": str(e)[:80]}
+        result["status"] = "DOCKER_NOT_AVAILABLE"
+        result["message"] = str(e)[:80]
+
+    # Check Sentry DSN across all services
+    config_path = Path(__file__).parent / "config.yaml"
+    if config_path.exists():
+        with open(config_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        dsn_count = 0
+        for svc_name, svc in cfg.get("services", {}).items():
+            if svc.get("status") in ("archived", "replaced"):
+                continue
+            svc_path = ROOT / svc["path"]
+            if not svc_path.exists():
+                continue
+            for env_name in (".env.local", ".env"):
+                env_file = svc_path / env_name
+                if not env_file.exists():
+                    continue
+                try:
+                    content = env_file.read_text(encoding="utf-8", errors="replace")
+                    for line in content.split("\n"):
+                        line = line.strip()
+                        if line.startswith("SENTRY_DSN=") and not line.startswith("#"):
+                            val = line.split("=", 1)[1].strip()
+                            if val and val != "<add-your-dsn>" and not val.startswith("<"):
+                                dsn_count += 1
+                                break
+                except Exception:
+                    pass
+        result["sentry_dsn"] = dsn_count
+        result["sentry_status"] = "CONFIGURED" if dsn_count > 0 else "MISSING"
+    
+    return result
 
 
 def check_memory_db():
@@ -288,8 +328,9 @@ def print_summary(checks: dict):
         elif name == "observability":
             containers = result.get("containers", 0)
             running = result.get("running", 0)
+            sentry = result.get("sentry_status", "UNKNOWN")
             if containers:
-                print(f"  {color}[{status}]{RESET} {label}: {running}/{containers} containers running")
+                print(f"  {color}[{status}]{RESET} {label}: Docker {running}/{containers} | Sentry DSN: {GREEN if sentry == 'CONFIGURED' else RED}{sentry}{RESET}")
             else:
                 print(f"  {color}[{status}]{RESET} {label}: {result.get('message', 'unknown')}")
 

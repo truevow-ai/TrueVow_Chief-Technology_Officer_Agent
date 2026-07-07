@@ -344,8 +344,8 @@ def _parse_incidents() -> dict:
 
 
 def _check_observability() -> dict:
-    """Check if observability stack (Docker) is deployed and running."""
-    result = {"status": "UNKNOWN", "components": {}}
+    """Check if observability stack (Docker) is deployed and if Sentry DSN is configured."""
+    result = {"status": "UNKNOWN", "components": {}, "sentry_dsn": "MISSING"}
     
     docker_compose = ROOT / "shared-libraries" / "observability" / "docker-compose.yml"
     if not docker_compose.exists():
@@ -378,6 +378,33 @@ def _check_observability() -> dict:
             result["status"] = "NOT_DEPLOYED"
     except (FileNotFoundError, Exception):
         result["status"] = "DOCKER_NOT_AVAILABLE"
+
+    # Check if ANY service has a real Sentry DSN configured (not the placeholder)
+    dsn_services = 0
+    for svc_name, svc in _load_config().get("services", {}).items():
+        if svc.get("status") in ("archived", "replaced"):
+            continue
+        svc_path = ROOT / svc["path"]
+        if not svc_path.exists():
+            continue
+        env_files = list(svc_path.glob(".env.local")) + list(svc_path.glob(".env"))
+        for env_f in env_files:
+            try:
+                content = env_f.read_text(encoding="utf-8", errors="replace")
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line.startswith("SENTRY_DSN=") and not line.startswith("#"):
+                        val = line.split("=", 1)[1].strip()
+                        if val and val != "<add-your-dsn>" and not val.startswith("<"):
+                            dsn_services += 1
+                            break
+            except Exception:
+                pass
+
+    if dsn_services > 0:
+        result["sentry_dsn"] = f"CONFIGURED ({dsn_services} services)"
+    elif dsn_services == 0:
+        result["sentry_dsn"] = "MISSING (no real DSN in any service)"
 
     return result
 
@@ -624,6 +651,7 @@ def scan_services(json_output: bool = False, store_memory: bool = True, detail: 
         "active_services": active_count,
         "status_breakdown": status_counts,
         "observability": observability.get("status", "UNKNOWN"),
+        "sentry_dsn": observability.get("sentry_dsn", "MISSING"),
         "overall": "DEGRADED" if (dirty or missing or errors or stale_count > 0) else "HEALTHY",
     }
 
@@ -702,8 +730,10 @@ def _print_scan_report(summary: dict, results: dict, kanban: dict = None, incide
 
     # Row 4: Observability
     obs = summary.get("observability", "UNKNOWN")
+    dsn = _check_observability().get("sentry_dsn", "MISSING")
     obs_color = GREEN if obs == "RUNNING" else YELLOW if obs == "STOPPED" else RED
-    print(f"  {BOLD}Observability{RESET}: {obs_color}{obs}{RESET} (Docker Prometheus+Grafana+Jaeger+Sentry)")
+    dsn_color = GREEN if "CONFIGURED" in dsn else RED
+    print(f"  {BOLD}Docker{RESET}: {obs_color}{obs}{RESET}  |  {BOLD}Sentry{RESET}: {dsn_color}{dsn}{RESET}")
 
     print()
 
