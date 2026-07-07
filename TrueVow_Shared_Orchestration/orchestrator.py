@@ -497,7 +497,7 @@ def _get_agent_activity() -> dict:
         return {}
 
 
-def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
+def scan_services(json_output: bool = False, store_memory: bool = True, detail: bool = False) -> dict:
     """
     Scan git state of all registered services.
     Returns structured data. Optionally stores in memory.db.
@@ -656,12 +656,12 @@ def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
     if json_output:
         print(json.dumps({"summary": summary, "services": results}, indent=2, ensure_ascii=False))
     else:
-        _print_scan_report(summary, results)
+        _print_scan_report(summary, results, kanban_tasks, incident_data, detail)
 
     return {"summary": summary, "services": results}
 
 
-def _print_scan_report(summary: dict, results: dict):
+def _print_scan_report(summary: dict, results: dict, kanban: dict = None, incidents: dict = None, detail: bool = False):
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
@@ -785,6 +785,31 @@ def _print_scan_report(summary: dict, results: dict):
             print(f"    {YELLOW}└─ {dirty_n} uncommitted files{RESET}")
         elif dirty_n > 20:
             print(f"    {RED}└─ {dirty_n} uncommitted files (large){RESET}")
+
+        # Drill-down: show actual task descriptions when --detail flag is set
+        if detail:
+            svc_kanban = (kanban or {}).get(svc_name, {})
+            svc_incidents = (incidents or {}).get(svc_name, {}).get("items", [])
+
+            task_lines = []
+            for section, entries in svc_kanban.items():
+                for e in entries[:5]:  # limit 5 per section
+                    prefix = {"active": "▶", "blocked": "✖", "pending": "○", "done": "✓"}.get(section, "·")
+                    task_lines.append(f"     {CYAN}{prefix} [{section}]{RESET} {e['text']}")
+
+            incident_lines = []
+            for inc in svc_incidents[:3]:
+                icon = "✓" if inc["status"] == "resolved" else "✖"
+                incident_lines.append(f"     {RED}{icon} [incident]{RESET} {inc['title'][:70]}")
+
+            if task_lines or incident_lines:
+                print(f"    {BOLD}── DETAILS ──{RESET}")
+                if task_lines:
+                    for l in task_lines:
+                        print(l)
+                if incident_lines:
+                    for l in incident_lines:
+                        print(l)
 
     print()
 
@@ -1173,6 +1198,7 @@ def main():
     elif cmd_name == "scan-services":
         json_out = "--json" in sys.argv
         watch = "--watch" in sys.argv
+        detail = "--detail" in sys.argv
         if watch:
             interval = 3600
             for i, arg in enumerate(sys.argv):
@@ -1181,14 +1207,14 @@ def main():
             print(f"[scan-services] Watch mode: scanning every {interval}s. Ctrl+C to stop.")
             try:
                 while True:
-                    scan_services(json_output=json_out)
+                    scan_services(json_output=json_out, detail=detail)
                     if json_out:
                         break
                     time.sleep(interval)
             except KeyboardInterrupt:
                 print("\n[scan-services] Stopped.")
         else:
-            scan_services(json_output=json_out)
+            scan_services(json_output=json_out, detail=detail)
     elif cmd_name == "truth-loop":
         svc = sys.argv[2] if len(sys.argv) > 2 else ""
         max_attempts = 3
