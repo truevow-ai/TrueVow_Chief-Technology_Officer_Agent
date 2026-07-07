@@ -161,6 +161,48 @@ def dispatch(user_request: str):
 #  SCAN-SERVICES: Real-time git state of all services
 # ═══════════════════════════════════════════════
 
+def _get_agent_activity() -> dict:
+    """Query memory.db for recent agent check-ins. Returns {agent_id: details}."""
+    import sqlite3
+    db_path = ROOT / "TrueVow_Shared_Codebase_Memory" / "memory.db"
+    if not db_path.exists():
+        return {}
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT content, updated_at FROM memories
+            WHERE tags LIKE '%agent-checkin%'
+            ORDER BY updated_at DESC
+            LIMIT 200
+        """).fetchall()
+        conn.close()
+
+        agents = {}
+        for row in rows:
+            try:
+                data = json.loads(row["content"])
+                agent_id = data.get("agent_id", "")
+                ts = data.get("timestamp", "") or row["updated_at"]
+                if agent_id and ts and agent_id not in agents:
+                    try:
+                        last = datetime.fromisoformat(ts)
+                        age_h = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+                        agents[agent_id] = {
+                            "hours_ago": round(age_h, 1),
+                            "action": data.get("action", ""),
+                            "status": data.get("status", ""),
+                            "message": data.get("message", "")[:100],
+                        }
+                    except (ValueError, TypeError):
+                        continue
+            except (json.JSONDecodeError, TypeError):
+                continue
+        return agents
+    except Exception:
+        return {}
+
+
 def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
     """
     Scan git state of all registered services.
@@ -240,6 +282,21 @@ def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
     missing = sum(1 for r in results.values() if r.get("status") in ("MISSING", "NO_GIT"))
     errors = sum(1 for r in results.values() if r.get("status") == "ERROR")
 
+    # Agent activity recency check
+    agent_activity = _get_agent_activity()
+    stale_services = []
+    for svc_name in results:
+        act = agent_activity.get(svc_name)
+        if act:
+            results[svc_name]["agent_activity"] = act
+            if act["hours_ago"] > 24:
+                stale_services.append(svc_name)
+        else:
+            stale_services.append(svc_name)
+
+    stale_count = len(stale_services)
+    active_count = total - stale_count
+
     summary = {
         "timestamp": timestamp,
         "total": total,
@@ -247,17 +304,21 @@ def scan_services(json_output: bool = False, store_memory: bool = True) -> dict:
         "dirty": dirty,
         "missing": missing,
         "errors": errors,
-        "overall": "DEGRADED" if (dirty or missing or errors) else "HEALTHY",
+        "stale_services": stale_count,
+        "active_services": active_count,
+        "overall": "DEGRADED" if (dirty or missing or errors or stale_count > 0) else "HEALTHY",
     }
 
     # Store in memory for historical tracking
     if store_memory:
         content = json.dumps({
             "summary": summary,
+            "stale_services": stale_services,
             "services": {k: {
                 "latest_commit": v.get("latest_commit", ""),
                 "status": v.get("status", ""),
                 "dirty_files": v.get("dirty_files", 0),
+                "agent_activity": v.get("agent_activity"),
             } for k, v in results.items()},
         }, indent=2)
         subprocess.Popen(
@@ -289,7 +350,11 @@ def _print_scan_report(summary: dict, results: dict):
     print(f"\n{BOLD}=== SERVICE GIT STATE SCAN ==={RESET}")
     print(f"Time: {summary['timestamp'][:19]}")
     print(f"Overall: {overall_color}{summary['overall']}{RESET}")
-    print(f"  {GREEN}{summary['clean']} CLEAN{RESET} | {YELLOW}{summary['dirty']} DIRTY{RESET} | {RED}{summary['missing']} MISSING{RESET} | {RED}{summary['errors']} ERROR{RESET}")
+    print(f"  Git: {GREEN}{summary['clean']} CLEAN{RESET} | {YELLOW}{summary['dirty']} DIRTY{RESET} | {RED}{summary['missing']} MISSING{RESET} | {RED}{summary['errors']} ERROR{RESET}")
+    stale_count = summary.get("stale_services", 0)
+    active_count = summary.get("active_services", 0)
+    stale_str = f"{RED}{stale_count} STALE{RESET}" if stale_count > 0 else f"{GREEN}{stale_count} STALE{RESET}"
+    print(f"  Agents: {GREEN}{active_count} active{RESET} | {stale_str} (no check-in >24h)")
     print()
 
     for svc_name, result in results.items():
@@ -308,10 +373,20 @@ def _print_scan_report(summary: dict, results: dict):
         dirty_n = result.get("dirty_files", 0)
         dirty_str = f" ({dirty_n} uncommitted)" if dirty_n else ""
 
-        print(f"  {icon} {CYAN}{svc_name}{RESET} [{result.get('type', '')}]")
+        act = result.get("agent_activity")
+        if act:
+            age_h = act["hours_ago"]
+            age_str = f"{age_h:.0f}h ago" if age_h < 24 else f"{RED}{age_h:.0f}h ago{RESET}"
+            act_str = f" [Agent: {act['status']} {age_str}]"
+            if act["message"]:
+                act_str += f" — {act['message'][:60]}"
+        else:
+            act_str = f" {RED}[NO AGENT ACTIVITY]{RESET}"
+
+        print(f"  {icon} {CYAN}{svc_name}{RESET} [{result.get('type', '')}]{act_str}")
         print(f"     {branch}: {commit}{dirty_str}")
         if dirty_n and result.get("dirty_detail"):
-            for line in result["dirty_detail"].split("\n")[:5]:
+            for line in result["dirty_detail"].split("\n")[:3]:
                 print(f"       {YELLOW}{line}{RESET}")
     print()
 
