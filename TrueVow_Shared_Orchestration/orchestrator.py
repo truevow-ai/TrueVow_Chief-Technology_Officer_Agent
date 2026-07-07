@@ -1138,6 +1138,92 @@ def print_help():
     print("  python orchestrator.py dashboard           Live agent dashboard")
     print("  python orchestrator.py truth-loop <svc>    Self-healing auto-fix loop")
     print("  python orchestrator.py scan-services       Git state of all services [--watch] [--json]")
+    print("  python orchestrator.py deploy <svc>        Run truth-loop → if GREEN, deploy to Fly.io")
+
+
+def _deploy_service(service_name: str):
+    """Run truth-loop on a service. If GREEN, deploy it. If FAILED, block deploy."""
+    cfg = _load_config()
+    services = cfg.get("services", {})
+    
+    if service_name not in services:
+        print(f"Unknown service: {service_name}")
+        return
+    
+    svc = services[service_name]
+    if svc.get("status") in ("archived", "replaced"):
+        print(f"Service '{service_name}' is {svc.get('status')} — cannot deploy.")
+        return
+    
+    svc_path = ROOT / svc["path"]
+    if not svc_path.exists():
+        print(f"Service path not found: {svc_path}")
+        return
+
+    # Step 1: Run truth-loop
+    print(f"\n{'='*50}")
+    print(f"DEPLOY: {service_name}")
+    print(f"{'='*50}")
+    print(f"\n[1/3] Running truth-loop...")
+    
+    loop_script = Path(__file__).parent / "truth-loop.py"
+    r = subprocess.run(
+        [sys.executable, str(loop_script), service_name, "--max-attempts", "2"],
+        cwd=str(ROOT), timeout=600
+    )
+    
+    if r.returncode != 0:
+        print(f"\n{'='*50}")
+        print(f"DEPLOY BLOCKED: Truth-loop FAILED for {service_name}")
+        print(f"Fix the failures above, then re-run: python orchestrator.py deploy {service_name}")
+        print(f"{'='*50}")
+        return
+
+    # Step 2: Find deploy target
+    print(f"\n[2/3] Checking deploy target...")
+    fly_toml = svc_path / "fly.toml"
+    vercel_json = svc_path / "vercel.json"
+    
+    if fly_toml.exists():
+        print(f"  Found: fly.toml → deploying via Fly.io")
+        target = "fly"
+        deploy_cmd = ["fly", "deploy"]
+    elif vercel_json.exists():
+        print(f"  Found: vercel.json → deploying via Vercel")
+        target = "vercel"
+        deploy_cmd = ["vercel", "--prod"]
+    else:
+        print(f"\n{'='*50}")
+        print(f"DEPLOY BLOCKED: No deploy config found for {service_name}")
+        print(f"Expected fly.toml or vercel.json in {svc_path}")
+        print(f"{'='*50}")
+        return
+
+    # Step 3: Deploy
+    print(f"\n[3/3] Deploying...")
+    r2 = subprocess.run(
+        deploy_cmd,
+        cwd=str(svc_path),
+        timeout=300
+    )
+    
+    if r2.returncode == 0:
+        print(f"\n{'='*50}")
+        print(f"DEPLOYED: {service_name} → {target}")
+        print(f"{'='*50}")
+        
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).parent / "memory.py"), "remember",
+             "context", f"Deployed: {service_name} to {target}",
+             f"Service {service_name} deployed to {target} after truth-loop GREEN.",
+             "--tags", f"deploy,{target},GREEN,{service_name}",
+             "--importance", "7"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+    else:
+        print(f"\n{'='*50}")
+        print(f"DEPLOY FAILED: {service_name} truth-loop was GREEN but deploy command failed (exit={r2.returncode})")
+        print(f"{'='*50}")
 
 
 # ═══════════════════════════════════════════════
@@ -1270,6 +1356,12 @@ def main():
             r = subprocess.run(loop_args, cwd=str(ROOT), timeout=600)
         else:
             print("Usage: python orchestrator.py truth-loop <service-name> [--all] [--max-attempts N]")
+    elif cmd_name == "deploy":
+        svc = sys.argv[2] if len(sys.argv) > 2 else ""
+        if not svc:
+            print("Usage: python orchestrator.py deploy <service-name>")
+            sys.exit(1)
+        _deploy_service(svc)
     elif cmd_name in ("--help", "-h", "help"):
         print_help()
     else:
