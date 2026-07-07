@@ -402,7 +402,7 @@ services:
     truth_commands:
       frontend: [pnpm install, pnpm typecheck, pnpm lint, pnpm build, npx jest --testPathPatterns=tests/]
 
-  # ── SALES OPS ──
+   # ── SALES OPS ──
   TrueVow_Sales_Ops_Service:
     path: TrueVow_Sales_Ops_Service
     skills_dir: .opencode/skills
@@ -420,6 +420,7 @@ services:
       - .opencode/skills/**/SKILL.md
     truth_commands:
       frontend: [npm run lint, npm run typecheck, npm run build, npm test]
+      backend: [python scripts/health_check.py, python scripts/pipeline_phases.py verify]
 
   # ── TENANT APPLICATION ──
   TrueVow_Tenant_Application_Service:
