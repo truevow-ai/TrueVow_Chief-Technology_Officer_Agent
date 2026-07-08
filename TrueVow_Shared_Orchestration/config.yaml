@@ -631,7 +631,7 @@ services:
     skills_dir: .opencode/skills
     type: medical-records-chronology-engine
     stack: [python, fastapi, postgresql, react, typescript, aws]
-    phase: Phase-1B-complete
+    phase: Phase-1C-complete
     rules:
       - AGENTS.md
       - .opencode/skills/**/SKILL.md
@@ -640,7 +640,7 @@ services:
         - ".venv\\Scripts\\python.exe -m pytest -q"
         - ".venv\\Scripts\\python.exe -m ruff check ."
         - ".venv\\Scripts\\python.exe -m mypy app"
-    note: "Second-stage pipeline product (INTAKE -> TRACE -> SETTLE). Phase 1A (infra+DB+Clerk+audit) + Phase 1B (case init + SOL + PHI AES-256-GCM store + NPI provider extraction skeleton) COMPLETE and GREEN (25 tests). Platform-grounded per TRACE-Architecture-Decisions.md. Phase 1C (spaCy provider extraction + confirmation checklist + fax request) is next."
+    note: "Second-stage pipeline product (INTAKE -> TRACE -> SETTLE). Phases 1A+1B+1C COMPLETE and GREEN (36 tests). 1A infra+DB+Clerk+audit; 1B case init+SOL+PHI AES-256-GCM+NPI; 1C provider extraction (rule-based/spaCy)+confirmation Checkpoint1+HIPAA fax cover sheet+Fax.Plus transmit Checkpoint2+delivery webhook. Platform-grounded per TRACE-Architecture-Decisions.md. Phase 1D (record receipt + Textract OCR + chronology + gap/billing detection + prohibited-string filter) is next."
 
   TrueVow_First_Line_Support_Service:
     path: TrueVow_First_Line_Support_Service
