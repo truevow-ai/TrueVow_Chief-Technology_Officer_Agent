@@ -253,6 +253,10 @@ if __name__ == "__main__":
             i += 1
 
     if service_name == "--all":
-        truth_loop_all(max_attempts=max_attempts)
+        results = truth_loop_all(max_attempts=max_attempts)
+        any_failed = any(r and r.get("result") == "FAILED" for r in results.values())
+        sys.exit(1 if any_failed else 0)
     else:
-        truth_loop(service_name, max_attempts=max_attempts)
+        result = truth_loop(service_name, max_attempts=max_attempts)
+        # Exit non-zero on FAILED (or skipped/None) so the deploy gate can block.
+        sys.exit(0 if (result and result.get("result") == "GREEN") else 1)
