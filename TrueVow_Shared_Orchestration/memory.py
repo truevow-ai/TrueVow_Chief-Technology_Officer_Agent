@@ -416,10 +416,81 @@ def cli_update():
     db.close()
 
 
+def cli_export():
+    """Export the whole shared brain to a portable markdown digest.
+    Makes memory.db readable by ANY tool/agent without memory.py."""
+    out_path = None
+    args = sys.argv[2:]
+    i = 0
+    while i < len(args):
+        if args[i] == "--out" and i + 1 < len(args):
+            out_path = args[i + 1]; i += 2
+        else:
+            i += 1
+
+    db = _get_db()
+    rows = db.db.execute(
+        "SELECT * FROM memories ORDER BY category ASC, importance DESC, updated_at DESC"
+    ).fetchall()
+    memories = [db._row_to_dict(r) for r in rows]
+    summary = db.get_summary()
+    db.close()
+
+    if out_path is None:
+        root = Path(__file__).resolve().parent.parent
+        out_dir = root / "TrueVow_Context"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = str(out_dir / "memory-digest.md")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    def one_line(text: str) -> str:
+        return " ".join(str(text).split())
+
+    lines = []
+    lines.append("# TrueVow Shared Memory - Digest")
+    lines.append("")
+    lines.append("> AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.")
+    lines.append("> Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.")
+    lines.append("")
+    lines.append(f"- Generated: {now}")
+    lines.append(f"- Total memories: {summary['totalMemories']}")
+    lines.append("")
+
+    high = [m for m in memories if m["importance"] >= 8]
+    if high:
+        lines.append(f"## High-importance (8+) - {len(high)}")
+        lines.append("")
+        for m in sorted(high, key=lambda x: (-x["importance"], x["category"])):
+            tags = ", ".join(m["tags"]) if m["tags"] else "-"
+            lines.append(f"- **[{m['importance']}][{m['category']}] {one_line(m['title'])}** - {one_line(m['content'])}")
+            lines.append(f"  _by {m['source']} - {m['updatedAt'][:10]} - tags: {tags}_")
+        lines.append("")
+
+    for cat in CATEGORIES:
+        cat_mems = [m for m in memories if m["category"] == cat]
+        if not cat_mems:
+            continue
+        lines.append(f"## {cat} ({len(cat_mems)})")
+        lines.append("")
+        for m in cat_mems:
+            body = one_line(m["content"])
+            if len(body) > 300:
+                body = body[:300] + "..."
+            lines.append(f"- **[{m['importance']}] {one_line(m['title'])}** - {body}")
+            lines.append(f"  _by {m['source']} - {m['updatedAt'][:10]}_")
+        lines.append("")
+
+    content = "\n".join(lines) + "\n"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Exported {summary['totalMemories']} memories -> {out_path}")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(__doc__)
-        print("Commands: summarize | remember | recall | forget | update")
+        print("Commands: summarize | remember | recall | forget | update | export")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -433,6 +504,8 @@ if __name__ == "__main__":
         cli_forget()
     elif cmd == "update":
         cli_update()
+    elif cmd == "export":
+        cli_export()
     else:
         print(f"Unknown command: {cmd}")
-        print("Commands: summarize | remember | recall | forget | update")
+        print("Commands: summarize | remember | recall | forget | update | export")

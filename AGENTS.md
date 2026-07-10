@@ -3,6 +3,10 @@
 > **Skills are the new apps.** Harness-agnostic. Pure files + CLI. Works with any coding agent.
 > **Multi-developer.** Shared memory via git-tracked memory.db. All 4 devs sync one CTO brain.
 
+## START HERE — the CTO Second Brain
+
+**Before anything else, read [`TrueVow_Context/START-HERE.md`](TrueVow_Context/START-HERE.md).** It is the portable, tool-agnostic context any agent or developer is pointed at first — what TrueVow is, the service + trust-domain map, the binding decisions, and the voice/standards. Point any AI at `TrueVow_Context/` and it becomes the TrueVow CTO's second brain; no re-explaining the platform every session.
+
 ## Multi-Developer Setup (First Time)
 
 ```bash
