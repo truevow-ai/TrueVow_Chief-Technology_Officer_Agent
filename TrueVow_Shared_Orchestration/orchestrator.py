@@ -1084,10 +1084,21 @@ def push_memory():
     if git_user:
         who = git_user
 
-    # Get last memory title from recent entry
+    # Get a meaningful commit title: prefer the most-recent real decision/note,
+    # skipping routine agent-checkin/git-scan/context noise.
     conn = __import__('sqlite3').connect(str(memory_db))
     conn.row_factory = __import__('sqlite3').Row
-    row = conn.execute("SELECT title FROM memories ORDER BY updated_at DESC LIMIT 1").fetchone()
+    row = conn.execute(
+        """SELECT title FROM memories
+           WHERE category != 'context'
+             AND tags NOT LIKE '%agent-checkin%'
+             AND tags NOT LIKE '%git-scan%'
+             AND tags NOT LIKE '%git-status%'
+             AND tags NOT LIKE '%automated%'
+           ORDER BY updated_at DESC LIMIT 1"""
+    ).fetchone()
+    if not row:
+        row = conn.execute("SELECT title FROM memories ORDER BY updated_at DESC LIMIT 1").fetchone()
     conn.close()
     title = row["title"] if row else "shared knowledge update"
 

@@ -492,32 +492,40 @@ def cli_export():
 
 
 def cli_recalibrate():
-    """Brain hygiene: down-rate routine/automated operational entries (agent
-    check-ins, git scans) so the high-importance tier reflects real decisions,
-    not logging noise. Genuine architecture/decision memories are untouched.
+    """Brain hygiene: down-rate operational noise so the high-importance tier
+    reflects real decisions.
+      - Routine-tagged entries (agent-checkin, git-scan, ...) -> importance 4.
+      - 'context' observations capped at importance 6 (decision/architecture untouched).
     Use --dry-run to preview."""
     dry = "--dry-run" in sys.argv
-    target = 4
+    ROUTINE_TARGET = 4
+    CONTEXT_CAP = 6
     db = _get_db()
-    rows = db.db.execute("SELECT id, tags, importance FROM memories").fetchall()
+    rows = db.db.execute("SELECT id, category, tags, importance FROM memories").fetchall()
     before_high = sum(1 for r in rows if r["importance"] >= 8)
-    changed = 0
+    routine_changed = 0
+    context_changed = 0
     for r in rows:
         try:
             tags = set(json.loads(r["tags"] or "[]"))
         except Exception:
             tags = set()
-        if (tags & ROUTINE_TAGS) and r["importance"] > target:
-            changed += 1
-            if not dry:
-                db.db.execute("UPDATE memories SET importance = ? WHERE id = ?", (target, r["id"]))
+        new_imp = r["importance"]
+        if (tags & ROUTINE_TAGS) and new_imp > ROUTINE_TARGET:
+            new_imp = ROUTINE_TARGET
+            routine_changed += 1
+        elif r["category"] == "context" and new_imp > CONTEXT_CAP:
+            new_imp = CONTEXT_CAP
+            context_changed += 1
+        if new_imp != r["importance"] and not dry:
+            db.db.execute("UPDATE memories SET importance = ? WHERE id = ?", (new_imp, r["id"]))
     if not dry:
         db.db.commit()
     after = db.db.execute("SELECT importance FROM memories").fetchall()
     after_high = sum(1 for r in after if r["importance"] >= 8)
     db.close()
-    verb = "would down-rate" if dry else "down-rated"
-    print(f"Recalibrate ({'dry-run' if dry else 'applied'}): {verb} {changed} routine entries to importance {target}.")
+    tag = "dry-run" if dry else "applied"
+    print(f"Recalibrate ({tag}): {routine_changed} routine -> {ROUTINE_TARGET}, {context_changed} context capped at {CONTEXT_CAP}.")
     print(f"High-importance (8+): {before_high} -> {after_high}")
     if not dry:
         _stage_memory_db()
