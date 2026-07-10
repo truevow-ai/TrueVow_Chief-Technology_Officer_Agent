@@ -1,0 +1,51 @@
+version: "3.9"
+
+# Infisical self-hosted — local evaluation / Fly.io deployment.
+# For prod: Infisical's docker-compose.prod.yml is canonical.
+# https://github.com/Infisical/infisical/blob/main/docker-compose.prod.yml
+
+services:
+  infisical:
+    image: infisical/infisical:latest
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    env_file: server.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - infisical
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: infisical
+      POSTGRES_USER: infisical
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-change-me}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "infisical"]
+      interval: 10s
+      retries: 5
+    networks:
+      - infisical
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - infisical
+
+networks:
+  infisical:
+
+volumes:
+  pg_data:
+  redis_data:

@@ -40,4 +40,7 @@ Unified across services. **Source:** architecture memory (importance 10).
 - **TRACE / all tenant health data:** PHI never in logs or URLs; tenant isolation at three layers.
 **Source:** per-service `docs/00-Planning/*-Agent-Coding-Instructions.md`.
 
+### 9. Secrets Management — Infisical (Self-Hosted)
+Secrets are injected at runtime; `.env.local` does not exist in CI or production. Infisical (self-hosted on TrueVow infrastructure, MIT license) is the single source of truth for all keys, API tokens, and credentials across the platform. Rules: no duplicated secrets across services (one leaked `.env.local` = cross-service compromise); per-trust-domain scoping (App2 never holds App1/App3 secrets); every developer sees only secrets for their owned services (least privilege); a pre-commit hook catches committed secrets; rotation is logged. **Source:** `infisical/README.md`.
+
 _Curated 2026-07-10._
