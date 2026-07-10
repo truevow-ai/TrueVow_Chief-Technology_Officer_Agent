@@ -3,8 +3,8 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-10T19:35:40.314427+00:00
-- Total memories: 151
+- Generated: 2026-07-10T21:35:52.382151+00:00
+- Total memories: 153
 
 ## High-importance decisions (8+, routine noise excluded) - 66
 
@@ -287,8 +287,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (74)
+## context (76)
 
+- **[7] [DONE] DONE: SETTLE: completed 3 non-Exa pipeline items while Exa blocked | outcome: (1) linked verified carrier** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: completed 3 non-Exa pipeline items while Exa blocked | outcome: (1) linked verified carrier intelligence to verdicts - new settle_carrier_intelligence table, 9 carriers, 3070/4045 carrier-verdicts n...
+  _by user - 2026-07-10_
 - **[6] CourtListener crawler rate-limited — 66 duplicate instances exhausted quota** - Root cause: supervisor Match pattern referenced cl_crawl which never appears in python.exe command line, so supervisor never detected the running crawler, launching a new one every 180s. 66 instances accumulated, collectively exhausting CourtListener's 125 req/day quota. Fixed: Match pattern simplif...
   _by Admin - 2026-07-08_
 - **[6] SETTLE Truth-Loop GREEN again** - Truth-check restored to GREEN: ruff 0 issues, all 4 gates pass (core 41/42*, phase 13/13, full suite 186/186*, import OK). *1 OS-level socket error on test_bucket_to_midpoint (WinError 10055 — port exhaustion, not code bug). E2E tests now excluded from commit-gate (require live server). Supabase bac...
@@ -323,6 +325,8 @@
   _by user - 2026-06-25_
 - **[6] Documentation Status: TrueVow_Documentation is Stale** - TrueVow_Documentation/ contains older documentation (Word docs, markdown exports) including TrueVow_PRD.md, Complete System Technical Documentation, Financial Management guides, and Billing Service updates. These are outdated - they reflect the old architecture with DRAFT naming, CONNECT active, and...
   _by user - 2026-06-25_
+- **[5] [ACTIVE] BLOCKED: SETTLE: scaled Exa carrier+age enrichment blocked | attempted: built crash-safe resumable runner (pe** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "blocked", "status": "ACTIVE", "message": "SETTLE: scaled Exa carrier+age enrichment blocked | attempted: built crash-safe resumable runner (per-row checkpoint+heartbeat), scoped to carriers+ages only, launched top-8 states | blocker: Exa API H...
+  _by user - 2026-07-10_
 - **[5] Dispatch: continue testing the xai_cloud voice agent bridge** - Dispatched to skill='' phase='build' personas=[] tool=
   _by Admin - 2026-07-08_
 - **[5] Dispatch: new product service repo TRACE — spec-driven build of medical record retrieval a** - Dispatched to skill='incremental-implementation' phase='build' personas=[] tool=
