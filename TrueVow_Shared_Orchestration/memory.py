@@ -46,6 +46,10 @@ SORT_MAP = {
     "relevance": "updated_at DESC",
 }
 
+# Routine/automated operational memories (check-ins, git scans) — noise, not
+# decisions. Excluded from the digest highlights and down-rated by `recalibrate`.
+ROUTINE_TAGS = {"agent-checkin", "git-scan", "git-status", "automated", "services"}
+
 
 class MemoryDatabase:
     def __init__(self, db_path: str, wal_mode: bool = True):
@@ -457,9 +461,9 @@ def cli_export():
     lines.append(f"- Total memories: {summary['totalMemories']}")
     lines.append("")
 
-    high = [m for m in memories if m["importance"] >= 8]
+    high = [m for m in memories if m["importance"] >= 8 and not (set(m["tags"]) & ROUTINE_TAGS)]
     if high:
-        lines.append(f"## High-importance (8+) - {len(high)}")
+        lines.append(f"## High-importance decisions (8+, routine noise excluded) - {len(high)}")
         lines.append("")
         for m in sorted(high, key=lambda x: (-x["importance"], x["category"])):
             tags = ", ".join(m["tags"]) if m["tags"] else "-"
@@ -487,10 +491,42 @@ def cli_export():
     print(f"Exported {summary['totalMemories']} memories -> {out_path}")
 
 
+def cli_recalibrate():
+    """Brain hygiene: down-rate routine/automated operational entries (agent
+    check-ins, git scans) so the high-importance tier reflects real decisions,
+    not logging noise. Genuine architecture/decision memories are untouched.
+    Use --dry-run to preview."""
+    dry = "--dry-run" in sys.argv
+    target = 4
+    db = _get_db()
+    rows = db.db.execute("SELECT id, tags, importance FROM memories").fetchall()
+    before_high = sum(1 for r in rows if r["importance"] >= 8)
+    changed = 0
+    for r in rows:
+        try:
+            tags = set(json.loads(r["tags"] or "[]"))
+        except Exception:
+            tags = set()
+        if (tags & ROUTINE_TAGS) and r["importance"] > target:
+            changed += 1
+            if not dry:
+                db.db.execute("UPDATE memories SET importance = ? WHERE id = ?", (target, r["id"]))
+    if not dry:
+        db.db.commit()
+    after = db.db.execute("SELECT importance FROM memories").fetchall()
+    after_high = sum(1 for r in after if r["importance"] >= 8)
+    db.close()
+    verb = "would down-rate" if dry else "down-rated"
+    print(f"Recalibrate ({'dry-run' if dry else 'applied'}): {verb} {changed} routine entries to importance {target}.")
+    print(f"High-importance (8+): {before_high} -> {after_high}")
+    if not dry:
+        _stage_memory_db()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(__doc__)
-        print("Commands: summarize | remember | recall | forget | update | export")
+        print("Commands: summarize | remember | recall | forget | update | export | recalibrate")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -506,6 +542,8 @@ if __name__ == "__main__":
         cli_update()
     elif cmd == "export":
         cli_export()
+    elif cmd == "recalibrate":
+        cli_recalibrate()
     else:
         print(f"Unknown command: {cmd}")
-        print("Commands: summarize | remember | recall | forget | update | export")
+        print("Commands: summarize | remember | recall | forget | update | export | recalibrate")

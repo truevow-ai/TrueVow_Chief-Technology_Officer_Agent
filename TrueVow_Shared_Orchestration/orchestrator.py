@@ -1091,9 +1091,18 @@ def push_memory():
     conn.close()
     title = row["title"] if row else "shared knowledge update"
 
+    # Auto-refresh the portable memory digest so it commits alongside memory.db
+    try:
+        subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "memory.py"), "export"],
+            cwd=str(git_dir), capture_output=True, timeout=30
+        )
+    except Exception:
+        pass
+
     # Stage, commit, push
     subprocess.run(
-        ["git", "add", "TrueVow_Shared_Codebase_Memory/memory.db"],
+        ["git", "add", "TrueVow_Shared_Codebase_Memory/memory.db", "TrueVow_Context/memory-digest.md"],
         cwd=str(git_dir), capture_output=True, timeout=10
     )
     r = subprocess.run(
