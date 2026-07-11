@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-11T03:23:11.477560+00:00
-- Total memories: 158
+- Generated: 2026-07-11T07:50:03.195088+00:00
+- Total memories: 160
 
-## High-importance decisions (8+, routine noise excluded) - 68
+## High-importance decisions (8+, routine noise excluded) - 69
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -82,6 +82,8 @@
   _by user - 2026-06-25 - tags: saas-admin, hub, central, tenant-management, auth, database, architecture_
 - **[9][architecture] FM Service Wired to Ecosystem** - TrueVow_Financial_Management_Service is registered in the agent ecosystem with 13 domain agents (orchestrator, code-agent, search-agent, gl-agent, ar-agent, ap-agent, payroll-agent, treasury-agent, intercompany-agent, reporting-agent, affiliates-agent, benjamin-agent, fintech-patterns). Auto-dispatch routes FM-specific keywords (journal, invoice, payroll, treasury, intercompany, etc.) directly to the right domain agent SKILL.md.
   _by user - 2026-06-25 - tags: ecosystem, fm, financial-management, dispatch, integration, architecture_
+- **[9][decision] Multi-source corroboration as machine verification** - corroborate_verdicts.py: promote settle_verdicts pending->verified only when same case in >=2 independent sources (host-distinguished: static.case.law/CAP, courtlistener, morelaw) agree on amount within 1pct. Match key: shared reporter citation (from source_notes.official_citation) strongest, else normalized case_name+state+amount. 1249/12444 corroborated in dry-run. Disagreement (RJ Reynolds 20M vs 21M) / single-source / same-host-twice never promote. Records corroborating_sources evidence. Migration c0d1e2f3a4b5 + live promotion pending Supabase pooler recovery. This is the machine substitute for the not-yet-available human verifier; law-firm verification later layers ON TOP as a gold tier.
+  _by Admin - 2026-07-11 - tags: -_
 - **[9][decision] No-fabrication is now permanent process (RULE 0) across all pipelines** - Codified into AGENTS.md as RULE 0 non-negotiable. Two-gate pipeline (no_fabrication_gate + verdict_validator) for verdicts; cis_fabrication_gate for carriers; govdata verify_and_write_jsonl for govdata. All require source_url+verbatim evidence+integrity. recover_rejects.py re-verifies rejects against sources but only recovers missing-EVIDENCE cases, never missing-VALUE (classification) cases - measured 0/112556 recoverable in current set, correctly (criminal cases mis-flagged by injury keywords). Rejected/quarantined records all preserved on disk for future re-verification.
   _by Admin - 2026-07-10 - tags: -_
 - **[9][decision] TRACE decisions FINALIZED — 3 deviations approved; CPT/ICD catalog + PHI both live in TRACE's own DB** - Product owner (2026-07-08) APPROVED all 3 grounded deviations from spec LOCKED Section 2: (1) Auth = Clerk (App 3 Tenants), NOT Auth0; (2) Object storage = S3 via boto3 (following SETTLE s3_service.py) upgraded to SSE-KMS + AWS BAA for PHI bucket; (3) Observability = SigNoz(OTEL)+Sentry + append-only audit_log table + pgaudit, NOT CloudWatch. ICD/CPT PLACEMENT FINAL: owner correctly noted billing DB = single source of truth for SaaS subscriptions+metering only, and TRACE is the heavy consumer of the code catalog. DECISION: BOTH the per-case PHI medical bill lines AND the non-PHI CPT/ICD reference catalog live in TRACE's OWN operational DB (medical_bill_line + event_nodes for PHI, firm-RLS; cpt_reference + icd10_reference versioned catalog tables). Billing and FM schemas UNTOUCHED. Rationale: consumer co-location avoids cross-service latency on billing-recon hot path; keeps billing pure (subscriptions) and FM pure (corporate finance); TRACE owns catalog versioning lifecycle. Extraction via temp spaCy fallback from faxed BILLING docs (TODO), no rebuild. STILL BLOCKING Phase 1A code: (a) updated PRD still shows 9 open questions not 12; (b) amended Fly.io+Supabase spec not yet issued. Full detail in TRACE-Architecture-Decisions.md.
@@ -241,7 +243,7 @@
 - **[6] xai_cloud bridge test suite** - Created tests/test_xai_cloud_bridge.py (34 tests) for XaiCloudBridge. Mirrors test_xai_bridge.py but adapts for cloud bridge: dual registration (xai_cloud + xai_cloud_voice_agent), default voice rex (male-only), end_session returns {bridge,session_id,status} without had_audio, double-start early-ret...
   _by Admin - 2026-07-08_
 
-## decision (12)
+## decision (13)
 
 - **[10] All DB insert paths now gated server-side (full audit)** - Fiduciary audit of every settle_verdicts/settle_contributions insert repo-wide. Gaps found+closed: (1) API bulk_insert_verdicts + create_verdict had NO gate -> added app/services/verdict_guard.py (provenance+verbatim-evidence+enum+bounds, strips unverifiable fields, rejects no-provenance); (2) seed_...
   _by Admin - 2026-07-11_
@@ -253,6 +255,8 @@
   _by user - 2026-06-25_
 - **[10] CONNECT Archived - DRAFT Renamed to LEVERAGE - INTAKE Updated** - CONNECT (attorney referral network) is decommissioned and archived from the ecosystem permanently - no longer on TrueVow agenda. DRAFT has been completely replaced by LEVERAGE everywhere (same service, renamed). INTAKE (Tenant Application Service) is no longer just FSM NLP - it is now FSM applied to...
   _by user - 2026-06-25_
+- **[9] Multi-source corroboration as machine verification** - corroborate_verdicts.py: promote settle_verdicts pending->verified only when same case in >=2 independent sources (host-distinguished: static.case.law/CAP, courtlistener, morelaw) agree on amount within 1pct. Match key: shared reporter citation (from source_notes.official_citation) strongest, else n...
+  _by Admin - 2026-07-11_
 - **[9] No-fabrication is now permanent process (RULE 0) across all pipelines** - Codified into AGENTS.md as RULE 0 non-negotiable. Two-gate pipeline (no_fabrication_gate + verdict_validator) for verdicts; cis_fabrication_gate for carriers; govdata verify_and_write_jsonl for govdata. All require source_url+verbatim evidence+integrity. recover_rejects.py re-verifies rejects agains...
   _by Admin - 2026-07-10_
 - **[9] TRACE decisions FINALIZED — 3 deviations approved; CPT/ICD catalog + PHI both live in TRACE's own DB** - Product owner (2026-07-08) APPROVED all 3 grounded deviations from spec LOCKED Section 2: (1) Auth = Clerk (App 3 Tenants), NOT Auth0; (2) Object storage = S3 via boto3 (following SETTLE s3_service.py) upgraded to SSE-KMS + AWS BAA for PHI bucket; (3) Observability = SigNoz(OTEL)+Sentry + append-onl...
@@ -295,8 +299,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (79)
+## context (80)
 
+- **[7] [DONE] DONE: SETTLE: built multi-source corroboration = machine verification (answer to no-human-verifier problem** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: built multi-source corroboration = machine verification (answer to no-human-verifier problem) | outcome: corroborate_verdicts.py promotes pending->verified ONLY when same case appears in >=2 indepen...
+  _by user - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: full fiduciary security audit of every DB write path | outcome: archived 37 ungated scrapers** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: full fiduciary security audit of every DB write path | outcome: archived 37 ungated scrapers+feeders (preserved w/ README, not deleted); found+fixed the REAL gap - API service bulk_insert_verdicts +...
   _by user - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: killed ungated seed pipe + quarantined contaminated contributions | outcome: (1) user asked** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: killed ungated seed pipe + quarantined contaminated contributions | outcome: (1) user asked to stop Casemine - found threat was WIDER: 24 deprecated scripts (casemine x2, legal-blogs, extract-500 fa...
