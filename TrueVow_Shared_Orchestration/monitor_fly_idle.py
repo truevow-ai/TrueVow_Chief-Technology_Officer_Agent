@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 IDLE_MINUTES = 30
-CHECK_INTERVAL_S = 600   # every 10 minutes
+CHECK_INTERVAL_S = 1260  # every 21 minutes
 FLY_ORG = "truevow"
 
 def run(*args):
