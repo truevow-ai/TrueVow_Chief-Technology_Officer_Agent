@@ -15,6 +15,7 @@ Commands:
   python orchestrator.py skill-scan          Security scan skills
   python orchestrator.py sync-memory         Pull latest shared memory.db from git
   python orchestrator.py push-memory         Commit + push memory.db to shared repo
+  python orchestrator.py idle-monitor         Stop Fly.io machines idle >30min [--once]
   python orchestrator.py scan-services [--watch] [--json]  Scan git state of all registered services
 """
 
@@ -1155,6 +1156,7 @@ def print_help():
     print("  python orchestrator.py sync-obsidian       Sync to vault")
     print("  python orchestrator.py sync-memory         Pull shared memory from git")
     print("  python orchestrator.py push-memory         Commit + push memory to git")
+    print("  python orchestrator.py idle-monitor         Stop Fly machines idle >30min [--once]")
     print("  python orchestrator.py dashboard           Live agent dashboard")
     print("  python orchestrator.py truth-loop <svc>    Self-healing auto-fix loop")
     print("  python orchestrator.py scan-services       Git state of all services [--watch] [--json]")
@@ -1339,6 +1341,10 @@ def main():
         sync_memory()
     elif cmd_name == "push-memory":
         push_memory()
+    elif cmd_name == "idle-monitor":
+        from monitor_fly_idle import monitor, FLY_ORG
+        once = "--once" in sys.argv
+        monitor(FLY_ORG, once=once)
     elif cmd_name == "scan-services":
         json_out = "--json" in sys.argv
         watch = "--watch" in sys.argv

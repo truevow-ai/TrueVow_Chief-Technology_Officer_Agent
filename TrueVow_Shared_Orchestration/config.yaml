@@ -322,6 +322,7 @@ session:
   post_task:
     - remember: python TrueVow_Shared_Orchestration/memory.py remember <category> "<title>" "<content>" --importance N
     - push_knowledge: python TrueVow_Shared_Orchestration/orchestrator.py push-memory
+    - fly_idle_monitor: python TrueVow_Shared_Orchestration/orchestrator.py idle-monitor --once
     - sync: python TrueVow_Shared_Orchestration/obsidian-bridge.py
 
 # ═══════════════════════════════════════════════
@@ -625,13 +626,13 @@ services:
     truth_commands:
       backend: [python -m pytest tests/ -v, ruff check ., mypy .]
 
-  TrueVow_TRACE_Services:
-    path: TrueVow_TRACE_Services
+  TrueVow_Tenant_TRACE_Service:
+    path: TrueVow_Tenant_TRACE_Service
     status: building
     skills_dir: .opencode/skills
     type: medical-records-chronology-engine
-    stack: [python, fastapi, postgresql, react, typescript, aws]
-    phase: Phase-1C-complete
+    stack: [python, fastapi, postgresql, supabase, react, typescript, fly.io]
+    phase: Phase-1D-complete (Phase-1E ready for build)
     rules:
       - AGENTS.md
       - .opencode/skills/**/SKILL.md
@@ -640,7 +641,7 @@ services:
         - ".venv\\Scripts\\python.exe -m pytest -q"
         - ".venv\\Scripts\\python.exe -m ruff check ."
         - ".venv\\Scripts\\python.exe -m mypy app"
-    note: "Second-stage pipeline product (INTAKE -> TRACE -> SETTLE). Phases 1A+1B+1C COMPLETE and GREEN (36 tests). 1A infra+DB+Clerk+audit; 1B case init+SOL+PHI AES-256-GCM+NPI; 1C provider extraction (rule-based/spaCy)+confirmation Checkpoint1+HIPAA fax cover sheet+Fax.Plus transmit Checkpoint2+delivery webhook. Platform-grounded per TRACE-Architecture-Decisions.md. Phase 1D (record receipt + Textract OCR + chronology + gap/billing detection + prohibited-string filter) is next."
+    note: "Second-stage pipeline product (INTAKE -> TRACE -> SETTLE). Phases 1A-1D COMPLETE and GREEN (43 tests, per ADR-004). Phase 1E ready for build: Case Readiness Board, Tier 2 NLP flags, billing reconciliation, chronology export (PDF/JSON), BioClinical ModernBERT eval. 1A infra+DB+audit; 1B case init+SOL+PHI AES-256-GCM+NPI; 1C OpenMed provider extraction+Checkpoint1 confirmation+HIPAA fax cover sheet+Documo transmit Checkpoint2+delivery webhook; 1D record receipt+OCR (deepdoctection/DocTr Tier1, Mistral OCR 4 self-hosted Tier2)+chronology+gap/billing detection+prohibited-string filter. Billing LLM: Azure OpenAI GPT-4o-mini. Auth: Clerk (platform standard) via @truevow/auth-client ClerkWrapper + AuthContext -- NO Supabase Auth migration (ADR-003). Pre-1E gates: handwriting-spike WER + OCR_CLOUD_BACKEND lock. Platform-grounded per TRACE-Architecture-Decisions.md; decisions locked in ADR-003/ADR-004. NOTE: docs/00-Planning has a duplicate 'ADR-004-Phase1E-Architecture-Plan (1).md' worth removing."
 
   TrueVow_First_Line_Support_Service:
     path: TrueVow_First_Line_Support_Service
