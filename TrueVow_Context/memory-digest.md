@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-11T01:35:42.719161+00:00
-- Total memories: 155
+- Generated: 2026-07-11T03:23:11.477560+00:00
+- Total memories: 158
 
-## High-importance decisions (8+, routine noise excluded) - 67
+## High-importance decisions (8+, routine noise excluded) - 68
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -42,6 +42,8 @@
   _by Admin - 2026-07-07 - tags: -_
 - **[10][bug] Gitignore Source-Leak FIXED — All 6 services** - All 6 affected services now have anchored .gitignore patterns. lib/, env/, venv/, build/, dist/ now use leading / to prevent accidental source file hiding. Leaked PowerShell commands removed from FM, Billing, and LEVERAGE. SETTLE test_db_conn.py and recover_pyc.py anchored to root only. Internal Ops, SETTLE, and LEVERAGE latent rules also fixed.
   _by Admin - 2026-07-01 - tags: -_
+- **[10][decision] All DB insert paths now gated server-side (full audit)** - Fiduciary audit of every settle_verdicts/settle_contributions insert repo-wide. Gaps found+closed: (1) API bulk_insert_verdicts + create_verdict had NO gate -> added app/services/verdict_guard.py (provenance+verbatim-evidence+enum+bounds, strips unverifiable fields, rejects no-provenance); (2) seed_test_data.py fabricates random.uniform() rows -> blocked unless localhost+SETTLE_ALLOW_TEST_SEED; (3) archived 37 ungated scrapers/feeders. contributor.py is legit (firm submission, blockchain_hash, consent, DataValidator+anomaly). CI guard 15 tests / 4 layers. Only gated paths remain: cds loaders, load_direct_supabase, API (guarded), contributor (attested).
+  _by Admin - 2026-07-11 - tags: -_
 - **[10][decision] Quarantined 469 ungated legacy contributions feeding estimator** - settle_contributions held 469 rows from a single 2026-05-11 ungated seed batch (seed-via-supabase-client.py, bypassing gates): 0 contributor_user_id, 0 blockchain_hash, 0 source_type, 0 exact_outcome_amount - no provenance. They were live-feeding SettlementEstimator via status=approved. Quarantined all (status->pending, is_outlier=true, confidence=0, rejection_reason) - preserved for re-verification, never destroyed. Estimator now 0 approved -> graceful insufficient_data. Also kill-switched 24 ungated scripts + launcher. Zero honest output > fabricated estimates.
   _by Admin - 2026-07-11 - tags: -_
 - **[10][decision] No-fabrication prime directive enforced with evidence gate** - Every field entering settle_verdicts must trace to source_url + appear verbatim in an evidence snippet, else it is stripped; records without verifiable identity are rejected. no_fabrication_gate.verify_record tracks per-field validation_counts + field_evidence (stored in DB columns). Removed all guessing: expert-count split-in-half AND personal_injury_general case_type fallback. Purged 20003 rows, reloaded 11931 verifiable (13725 pass gate; some dedup). Rule: zero records beats fabricated data.
@@ -239,8 +241,10 @@
 - **[6] xai_cloud bridge test suite** - Created tests/test_xai_cloud_bridge.py (34 tests) for XaiCloudBridge. Mirrors test_xai_bridge.py but adapts for cloud bridge: dual registration (xai_cloud + xai_cloud_voice_agent), default voice rex (male-only), end_session returns {bridge,session_id,status} without had_audio, double-start early-ret...
   _by Admin - 2026-07-08_
 
-## decision (11)
+## decision (12)
 
+- **[10] All DB insert paths now gated server-side (full audit)** - Fiduciary audit of every settle_verdicts/settle_contributions insert repo-wide. Gaps found+closed: (1) API bulk_insert_verdicts + create_verdict had NO gate -> added app/services/verdict_guard.py (provenance+verbatim-evidence+enum+bounds, strips unverifiable fields, rejects no-provenance); (2) seed_...
+  _by Admin - 2026-07-11_
 - **[10] Quarantined 469 ungated legacy contributions feeding estimator** - settle_contributions held 469 rows from a single 2026-05-11 ungated seed batch (seed-via-supabase-client.py, bypassing gates): 0 contributor_user_id, 0 blockchain_hash, 0 source_type, 0 exact_outcome_amount - no provenance. They were live-feeding SettlementEstimator via status=approved. Quarantined ...
   _by Admin - 2026-07-11_
 - **[10] No-fabrication prime directive enforced with evidence gate** - Every field entering settle_verdicts must trace to source_url + appear verbatim in an evidence snippet, else it is stripped; records without verifiable identity are rejected. no_fabrication_gate.verify_record tracks per-field validation_counts + field_evidence (stored in DB columns). Removed all gue...
@@ -291,8 +295,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (77)
+## context (79)
 
+- **[7] [DONE] DONE: SETTLE: full fiduciary security audit of every DB write path | outcome: archived 37 ungated scrapers** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: full fiduciary security audit of every DB write path | outcome: archived 37 ungated scrapers+feeders (preserved w/ README, not deleted); found+fixed the REAL gap - API service bulk_insert_verdicts +...
+  _by user - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: killed ungated seed pipe + quarantined contaminated contributions | outcome: (1) user asked** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: killed ungated seed pipe + quarantined contaminated contributions | outcome: (1) user asked to stop Casemine - found threat was WIDER: 24 deprecated scripts (casemine x2, legal-blogs, extract-500 fa...
   _by user - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: completed 3 non-Exa pipeline items while Exa blocked | outcome: (1) linked verified carrier** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: completed 3 non-Exa pipeline items while Exa blocked | outcome: (1) linked verified carrier intelligence to verdicts - new settle_carrier_intelligence table, 9 carriers, 3070/4045 carrier-verdicts n...
@@ -331,6 +337,8 @@
   _by user - 2026-06-25_
 - **[6] Documentation Status: TrueVow_Documentation is Stale** - TrueVow_Documentation/ contains older documentation (Word docs, markdown exports) including TrueVow_PRD.md, Complete System Technical Documentation, Financial Management guides, and Billing Service updates. These are outdated - they reflect the old architecture with DRAFT naming, CONNECT active, and...
   _by user - 2026-06-25_
+- **[5] [ACTIVE] BLOCKED: SETTLE: bridging 12444 verified verdicts into estimator | attempted: built bridge_verdicts_to_estima** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "blocked", "status": "ACTIVE", "message": "SETTLE: bridging 12444 verified verdicts into estimator | attempted: built bridge_verdicts_to_estimator.py (label-only enum mapping, exact_outcome_amount verbatim, evidence preserved, reversible) - dry...
+  _by user - 2026-07-11_
 - **[5] [ACTIVE] BLOCKED: SETTLE: scaled Exa carrier+age enrichment blocked | attempted: built crash-safe resumable runner (pe** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "blocked", "status": "ACTIVE", "message": "SETTLE: scaled Exa carrier+age enrichment blocked | attempted: built crash-safe resumable runner (per-row checkpoint+heartbeat), scoped to carriers+ages only, launched top-8 states | blocker: Exa API H...
   _by user - 2026-07-10_
 - **[5] Dispatch: continue testing the xai_cloud voice agent bridge** - Dispatched to skill='' phase='build' personas=[] tool=
