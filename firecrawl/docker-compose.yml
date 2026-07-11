@@ -1,0 +1,73 @@
+# Firecrawl self-hosted — platform service.
+# Start: docker compose up -d    → http://localhost:3002 (API)  http://localhost:3003 (UI)
+# Services: API + worker + Redis + playwright-service (headless browser for JS pages).
+# Self-host docs: https://docs.firecrawl.dev/contributing/self-host
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - fc_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+    networks:
+      - fc_net
+
+  playwright-service:
+    image: mcr.microsoft.com/playwright:v1.52.0-jammy
+    restart: unless-stopped
+    environment:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
+    networks:
+      - fc_net
+
+  firecrawl-api:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${FC_API_PORT:-3002}:3002"
+    environment:
+      REDIS_URL: redis://redis:6379
+      REDIS_RATE_LIMIT_URL: redis://redis:6379
+      PORT: 3002
+      NUM_WORKERS_PER_QUEUE: 8
+      USE_DB_AUTHENTICATION: "false"
+      SUPABASE_SERVICE_TOKEN: ${SUPABASE_SERVICE_TOKEN:-}
+      LLAMAPARSE_API_KEY: ${LLAMAPARSE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000
+    networks:
+      - fc_net
+
+  firecrawl-worker:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      playwright-service:
+        condition: service_started
+    environment:
+      REDIS_URL: redis://redis:6379
+      REDIS_RATE_LIMIT_URL: redis://redis:6379
+      NUM_WORKERS_PER_QUEUE: 8
+      USE_DB_AUTHENTICATION: "false"
+      SUPABASE_SERVICE_TOKEN: ${SUPABASE_SERVICE_TOKEN:-}
+      LLAMAPARSE_API_KEY: ${LLAMAPARSE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000
+    entrypoint: ["npm", "run", "workers"]
+    networks:
+      - fc_net
+
+volumes:
+  fc_redis:
+
+networks:
+  fc_net:

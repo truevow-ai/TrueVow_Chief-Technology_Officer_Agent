@@ -1,11 +1,11 @@
 # Growthbook self-hosted — platform service.
-# Boots with `docker compose up -d`. Visit http://localhost:3000 to create admin.
-# For prod: set MONGO_PASSWORD / JWT_SECRET / ENCRYPTION_KEY via a .env file
-# (openssl rand -base64 32). Dev defaults below let it boot out of the box.
+# Start: docker compose up -d    → http://localhost:3000
+# MongoDB 7.0 + Growthbook latest. MongoDB data + Growthbook uploads
+# persist across restarts in named volumes.
 
 services:
   mongo:
-    image: mongo:6.0
+    image: mongo:7.0
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
@@ -16,6 +16,8 @@ services:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       retries: 5
+    networks:
+      - gb_net
 
   growthbook:
     image: growthbook/growthbook:latest
@@ -24,16 +26,21 @@ services:
       mongo:
         condition: service_healthy
     ports:
-      - "3000:3000"   # frontend
-      - "3100:3100"   # API
+      - "${GB_FRONTEND_PORT:-3000}:3000"
+      - "${GB_API_PORT:-3100}:3100"
     environment:
       MONGODB_URI: mongodb://root:${MONGO_PASSWORD:-devpassword}@mongo:27017/growthbook?authSource=admin
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       API_HOST: ${API_HOST:-http://localhost:3100}
-      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me-in-prod}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-change-me-in-prod}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-REPLACE-IN-PROD}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-REPLACE-IN-PROD}
     volumes:
       - gb_uploads:/usr/local/src/app/packages/back-end/uploads
+    networks:
+      - gb_net
+
+networks:
+  gb_net:
 
 volumes:
   gb_mongo:

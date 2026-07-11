@@ -1,0 +1,39 @@
+# Camofox self-hosted — stealth browser for AI agents.
+# Start:  docker compose up -d    → http://localhost:9377
+#         docker compose down      → stop + cleanup
+# VNC interactive login: http://localhost:6080
+# Restart policy: unless-stopped. Cookie/session persistence in named volume.
+# Docs: https://github.com/jo-inc/camofox-browser
+
+services:
+  camofox:
+    image: ghcr.io/jo-inc/camofox-browser:latest
+    restart: unless-stopped
+    ports:
+      - "${CAMOFOX_PORT:-9377}:9377"
+      - "${CAMOFOX_VNC_PORT:-6080}:6080"
+    environment:
+      CAMOFOX_PORT: 9377
+      CAMOFOX_API_KEY: ${CAMOFOX_API_KEY:-}
+      CAMOFOX_ACCESS_KEY: ${CAMOFOX_ACCESS_KEY:-}
+      ENABLE_VNC: ${CAMOFOX_ENABLE_VNC:-1}
+      VNC_PASSWORD: ${VNC_PASSWORD:-}
+      CAMOFOX_PROFILE_DIR: /app/data/profiles
+      CAMOFOX_COOKIES_DIR: /app/data/cookies
+      CAMOFOX_CRASH_REPORT_ENABLED: ${CAMOFOX_CRASH_REPORT_ENABLED:-false}
+      PROXY_STRATEGY: ${CAMOFOX_PROXY_STRATEGY:-}
+      PROXY_HOST: ${CAMOFOX_PROXY_HOST:-}
+      PROXY_PORT: ${CAMOFOX_PROXY_PORT:-}
+      PROXY_USERNAME: ${CAMOFOX_PROXY_USERNAME:-}
+      PROXY_PASSWORD: ${CAMOFOX_PROXY_PASSWORD:-}
+    volumes:
+      - camofox_data:/app/data
+    shm_size: "2gb"
+    networks:
+      - cm_net
+
+networks:
+  cm_net:
+
+volumes:
+  camofox_data:
