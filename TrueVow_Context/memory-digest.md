@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-10T21:35:52.382151+00:00
-- Total memories: 153
+- Generated: 2026-07-11T01:35:42.719161+00:00
+- Total memories: 155
 
-## High-importance decisions (8+, routine noise excluded) - 66
+## High-importance decisions (8+, routine noise excluded) - 67
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -42,6 +42,8 @@
   _by Admin - 2026-07-07 - tags: -_
 - **[10][bug] Gitignore Source-Leak FIXED — All 6 services** - All 6 affected services now have anchored .gitignore patterns. lib/, env/, venv/, build/, dist/ now use leading / to prevent accidental source file hiding. Leaked PowerShell commands removed from FM, Billing, and LEVERAGE. SETTLE test_db_conn.py and recover_pyc.py anchored to root only. Internal Ops, SETTLE, and LEVERAGE latent rules also fixed.
   _by Admin - 2026-07-01 - tags: -_
+- **[10][decision] Quarantined 469 ungated legacy contributions feeding estimator** - settle_contributions held 469 rows from a single 2026-05-11 ungated seed batch (seed-via-supabase-client.py, bypassing gates): 0 contributor_user_id, 0 blockchain_hash, 0 source_type, 0 exact_outcome_amount - no provenance. They were live-feeding SettlementEstimator via status=approved. Quarantined all (status->pending, is_outlier=true, confidence=0, rejection_reason) - preserved for re-verification, never destroyed. Estimator now 0 approved -> graceful insufficient_data. Also kill-switched 24 ungated scripts + launcher. Zero honest output > fabricated estimates.
+  _by Admin - 2026-07-11 - tags: -_
 - **[10][decision] No-fabrication prime directive enforced with evidence gate** - Every field entering settle_verdicts must trace to source_url + appear verbatim in an evidence snippet, else it is stripped; records without verifiable identity are rejected. no_fabrication_gate.verify_record tracks per-field validation_counts + field_evidence (stored in DB columns). Removed all guessing: expert-count split-in-half AND personal_injury_general case_type fallback. Purged 20003 rows, reloaded 11931 verifiable (13725 pass gate; some dedup). Rule: zero records beats fabricated data.
   _by Admin - 2026-07-10 - tags: -_
 - **[10][decision] OSS Tool Stack - Chatwoot + Mattermost + Novu + PostHog Deployed** - Four open-source tools deployed to replace/augment custom services: 1) CHATWOOT (21.5k stars) replaces First-Line Support Service at port 3007 - multi-channel inbox, ticketing, knowledge base, AI co-pilot, CSAT. First-Line Support repo archived. 2) MATTERMOST (30k+ stars) replaces Internal Ops Team Chat at port 8065 - Slack alternative. 3) NOVU (35k+ stars) replaces custom notifications across all services at ports 3009/4200 - unified email/SMS/push/in-app. 4) POSTHOG (29k+ stars) augments Platform Analytics at port 8010 - product analytics, session recording. All managed via shared-libraries/oss-tools/docker-compose.yml. Docker Hub connectivity issues may require retry on docker-compose up.
@@ -237,8 +239,10 @@
 - **[6] xai_cloud bridge test suite** - Created tests/test_xai_cloud_bridge.py (34 tests) for XaiCloudBridge. Mirrors test_xai_bridge.py but adapts for cloud bridge: dual registration (xai_cloud + xai_cloud_voice_agent), default voice rex (male-only), end_session returns {bridge,session_id,status} without had_audio, double-start early-ret...
   _by Admin - 2026-07-08_
 
-## decision (10)
+## decision (11)
 
+- **[10] Quarantined 469 ungated legacy contributions feeding estimator** - settle_contributions held 469 rows from a single 2026-05-11 ungated seed batch (seed-via-supabase-client.py, bypassing gates): 0 contributor_user_id, 0 blockchain_hash, 0 source_type, 0 exact_outcome_amount - no provenance. They were live-feeding SettlementEstimator via status=approved. Quarantined ...
+  _by Admin - 2026-07-11_
 - **[10] No-fabrication prime directive enforced with evidence gate** - Every field entering settle_verdicts must trace to source_url + appear verbatim in an evidence snippet, else it is stripped; records without verifiable identity are rejected. no_fabrication_gate.verify_record tracks per-field validation_counts + field_evidence (stored in DB columns). Removed all gue...
   _by Admin - 2026-07-10_
 - **[10] OSS Tool Stack - Chatwoot + Mattermost + Novu + PostHog Deployed** - Four open-source tools deployed to replace/augment custom services: 1) CHATWOOT (21.5k stars) replaces First-Line Support Service at port 3007 - multi-channel inbox, ticketing, knowledge base, AI co-pilot, CSAT. First-Line Support repo archived. 2) MATTERMOST (30k+ stars) replaces Internal Ops Team ...
@@ -287,8 +291,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (76)
+## context (77)
 
+- **[7] [DONE] DONE: SETTLE: killed ungated seed pipe + quarantined contaminated contributions | outcome: (1) user asked** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: killed ungated seed pipe + quarantined contaminated contributions | outcome: (1) user asked to stop Casemine - found threat was WIDER: 24 deprecated scripts (casemine x2, legal-blogs, extract-500 fa...
+  _by user - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: completed 3 non-Exa pipeline items while Exa blocked | outcome: (1) linked verified carrier** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: completed 3 non-Exa pipeline items while Exa blocked | outcome: (1) linked verified carrier intelligence to verdicts - new settle_carrier_intelligence table, 9 carriers, 3070/4045 carrier-verdicts n...
   _by user - 2026-07-10_
 - **[6] CourtListener crawler rate-limited — 66 duplicate instances exhausted quota** - Root cause: supervisor Match pattern referenced cl_crawl which never appears in python.exe command line, so supervisor never detected the running crawler, launching a new one every 180s. 66 instances accumulated, collectively exhausting CourtListener's 125 req/day quota. Fixed: Match pattern simplif...
