@@ -1,0 +1,21 @@
+app = "truevow-growthbook"
+primary_region = "ams"
+
+[build]
+  image = "growthbook/growthbook:latest"
+
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  [[services.ports]]
+    port = 443
+    handlers = ["http"]
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+[[services]]
+  internal_port = 3100
+  protocol = "tcp"
+  [[services.ports]]
+    port = 3100

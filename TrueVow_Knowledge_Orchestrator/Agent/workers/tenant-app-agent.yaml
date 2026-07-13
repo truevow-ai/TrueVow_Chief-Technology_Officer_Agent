@@ -1,0 +1,42 @@
+name: "tenant-app-agent"
+developer: "ghulam-ghaus"
+location: "Faisalabad"
+service: "tenant-app"
+port: 3022
+runtime:
+  type: opencode
+skills:
+  - load-service-context
+  - run-vector-search
+  - write-session-log
+  - vault-log
+  - log-blocker
+  - log-task-completion
+  - log-test-result
+  - propagate-cross-bridge-changes
+permissions:
+  read_env:
+    - "TENANT_APP_DATABASE_URL"
+    - "TENANT_APP_SERVICE_API_KEY"
+    - "TWILIO_ACCOUNT_SID"
+    - "DEEPGRAM_API_KEY"
+    - "CARTESIA_API_KEY"
+    - "GEMINI_API_KEY"
+  write_paths:
+    - "app/services/"
+    - "app/api/"
+    - "app/services/voice/bridges/"
+  can_commit: true
+  can_deploy: true
+  can_delete: false
+memory:
+  session_log: "Session-Logs/live/{date}.jsonl"
+  context_files:
+    - "Cross-Service/truevow-tenant-application-service.md"
+    - "Projects/tenant-app-bridges.md"
+lifecycle:
+  max_idle_minutes: 120
+  heartbeat_interval_sec: 300
+  max_retries: 3
+  timeout_minutes: 240
+state: pending

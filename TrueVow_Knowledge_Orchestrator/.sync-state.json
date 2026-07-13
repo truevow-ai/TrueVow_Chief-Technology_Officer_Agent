@@ -1,0 +1,18 @@
+{
+  "lastRun": "2026-05-28T19:13:07.723Z",
+  "lastCommitPerRepo": {
+    "TrueVow_Customer_Success_CORE_Service": "0ee17e4e13bfe23228e6e8a51f2644aeb9c46372",
+    "TrueVow_Financial_Management_Service": "8187c839686c48d3874e1f390098e2c8f96f9cfb",
+    "TrueVow_First_Line_Support_Service": "7d054ab8cd2b190843ac9a68fe41fdad55f8ebd6",
+    "TrueVow_Internal_Ops_Service": "6348e916bd41d362d5693cf3dd14f790e383d195",
+    "TrueVow_SaaS_Administration_Service": "4cb134503a87b91466539fd3aeab60d7ced5488c",
+    "TrueVow_Sales_Ops_Service": "e08ea4d25d21acbc269b96bf35759dc918d7dda4",
+    "TrueVow_Tenant_Application_Service": "3d0e55df6d81fded4b7c9f49d25bdf0865c718f6",
+    "TrueVow-Tenant_Billing-Service": "43b046154ce53b8c9a64efa8696441240a831c76",
+    "TrueVow_Tenant_CONNECT_Service": "0525645d2d965bbcc2476ad6cb097dc3d75a5728",
+    "Truevow_Tenant_Customer_Portal_Service": "5e25468c9e90bc3a9bbd12347180f3a291bdd10f",
+    "TrueVow_Tenant_LEVERAGE_Service": "e321d022aa6b48cde000515f880dcf8b74009e8e",
+    "TrueVow_Tenant_SETTLE-Service": "471c1496e1c3d3513564109903e130963477ac44",
+    "2025_TrueVow_Website": "515c85b6b18a4dd326435aaf990088518c45c61b"
+  }
+}

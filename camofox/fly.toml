@@ -1,0 +1,15 @@
+app = "truevow-camofox"
+primary_region = "ams"
+
+[build]
+  image = "ghcr.io/jo-inc/camofox-browser:latest"
+
+[[services]]
+  internal_port = 9377
+  protocol = "tcp"
+  [[services.ports]]
+    port = 443
+    handlers = ["http"]
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]

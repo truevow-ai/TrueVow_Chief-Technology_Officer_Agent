@@ -1,0 +1,15 @@
+app = "truevow-infisical"
+primary_region = "iad"
+
+[build]
+  image = "infisical/infisical:latest"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  [[services.ports]]
+    port = 443
+    handlers = ["http"]
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]

@@ -1,0 +1,315 @@
+# ============================================================================
+# TrueVow .triage.yaml
+# Pipeline contract for the 7-layer agent OS.
+# Read by the Orchestrator at session start (Layer 6) and the Feedback Agent
+# during weekly review (Layer 7). Lives at the vault root so it is gitignored
+# with the rest of the knowledge graph.
+#
+# Engine is agent-based, not Python — this YAML is a spec the Orchestrator
+# reads as plain text. No runtime, no daemon, no API keys.
+#
+# Adapted from NousResearch/hermes-agent / tonbistudio/hermes-multi-agent-workflow
+# triage.yaml. Hermes uses this to drive a Python engine; we use it to keep
+# the Orchestrator's judgment deterministic and auditable.
+# ============================================================================
+
+name: truevow-triage
+version: 1
+vault_root: TrueVow_Knowledge/
+
+# ---------------------------------------------------------------------------
+# SOURCES — Layer 1: Ingestion. What flows into the system and how.
+# Each source has an extractor (script or human/manual), a frequency, and a
+# normalized item type. New sources = new entries here, no code changes.
+# ---------------------------------------------------------------------------
+sources:
+  - id: git
+    extractor: "@truevow/knowledge-sync"
+    frequency: daily
+    schedule_hint: "windows-task-scheduler / npm run sync"
+    item_type: commit
+    fields: [sha, date, service, message, files_changed]
+
+  - id: session
+    extractor: "Orchestrator writes inline → Session-Logs/"
+    frequency: per-session
+    item_type: finding
+    fields: [date, focus, decision, blocker, service, related]
+
+  - id: code-mapper
+    extractor: "@truevow/code-mapper"
+    frequency: on-demand
+    item_type: cleanup-candidate
+    fields: [service, file_count, issue_count, issue_types]
+
+  - id: ci
+    extractor: "github webhook → Incidents/"
+    frequency: on-failure
+    item_type: incident
+    fields: [service, run_id, status, log_excerpt, commit]
+
+  - id: pr
+    extractor: "gh pr list + webhook"
+    frequency: on-open, on-merge
+    item_type: decision
+    fields: [number, title, author, files, diff_summary, service]
+
+# ---------------------------------------------------------------------------
+# ITEM SCHEMA — common fields every item carries.
+# Used by dedup (title + claim), scoring (rubric dimensions), routing (path).
+# ---------------------------------------------------------------------------
+item_schema:
+  required: [id, type, title, source, date, status, score, path]
+  optional: [claim, evidence, service, severity, profit_impact, related]
+  statuses:
+    - intake             # just arrived, not yet deduped
+    - duplicate          # matched an existing item, sources merged
+    - scored             # rubric applied, awaiting route
+    - routed             # path assigned, prep in progress
+    - awaiting_approval  # human gate active
+    - approved           # gate passed, fulfillment in progress
+    - shelved            # gate rejected or threshold not met
+    - done               # written to vault folder
+    - rejected           # explicitly not worth tracking
+
+# ---------------------------------------------------------------------------
+# DEDUP — vector similarity to detect "we have seen this before"
+# Uses @truevow/knowledge-indexer (all-MiniLM-L6-v2) under the hood.
+#   duplicate_threshold:  cosine ≥ this → merge sources, do not re-process
+#   possible_threshold:   cosine ≥ this → flag as related, continue
+# ---------------------------------------------------------------------------
+dedup:
+  method: embedding
+  embedder: "all-MiniLM-L6-v2"
+  duplicate_threshold: 0.85
+  possible_threshold: 0.65
+  on_duplicate: merge-source       # append source, do not create new item
+  on_possible:  flag-and-link      # continue but add [[related: ...]]
+
+# ---------------------------------------------------------------------------
+# RUBRIC — Layer 2 scoring. Each dimension 0..max, sum compared to threshold.
+# Max here is 100. Items ≥ threshold advance to routing; below are shelved.
+# Scoring happens in the Orchestrator's judgment, not in code.
+# ---------------------------------------------------------------------------
+rubric:
+  threshold: 40
+  dimensions:
+    - {key: severity,        max: 25, hint: "blast radius — single user / one service / all services"}
+    - {key: frequency,       max: 20, hint: "how many sources mention it, how often it recurs"}
+    - {key: agent_solvable,  max: 20, hint: "can an agent fix, document, or automate this"}
+    - {key: profit_impact,   max: 20, hint: "revenue, cost, or risk reduction if resolved"}
+    - {key: strategic_fit,   max: 15, hint: "matches FIDUCIARY-MANDATE priorities"}
+
+# ---------------------------------------------------------------------------
+# CLASSIFIER — determines the path. Default: read the `type` field from intake.
+# Overrides win before the default.
+# ---------------------------------------------------------------------------
+classifier:
+  primary: type
+  overrides:
+    - if: severity == critical
+      path: incident
+
+# ---------------------------------------------------------------------------
+# ROUTE — map classifier values to paths.
+# Every value on the right MUST be a key under `paths:` below.
+# ---------------------------------------------------------------------------
+route:
+  map:
+    incident:           incident
+    adr:                adr
+    decision:           decision
+    finding:            session-finding
+    cleanup-candidate:  cleanup
+    commit:             shelve         # commits are evidence, not standalone items
+    unknown:            shelve
+
+# ---------------------------------------------------------------------------
+# PATHS — what happens per route outcome.
+#   prep:     analysis before the human gate
+#   propose:  who drafts the proposal shown to the human
+#   fulfill:  what happens after approval (write to vault, run subagent, etc.)
+#   auto:     true → no human gate, terminal path (e.g. shelve)
+#   gate:     required | optional — controls whether human must approve
+# ---------------------------------------------------------------------------
+paths:
+  incident:
+    severity_required: true
+    prep:
+      - {stage: gather_evidence,  role: orchestrator}
+      - {stage: search_past,      role: orchestrator,  tool: knowledge-indexer}
+      - {stage: draft_root_cause, role: orchestrator}
+    propose: {role: orchestrator, template: Templates/Incident.md}
+    fulfill:
+      - {stage: write_incident, role: orchestrator, target: "Incidents/Incident-{{id}}.md"}
+      - {stage: link_related,   role: orchestrator}
+    gate: required
+
+  adr:
+    prep:
+      - {stage: list_options,    role: orchestrator}
+      - {stage: check_existing,  role: orchestrator,  tool: knowledge-indexer}
+      - {stage: draft_decision,  role: orchestrator}
+    propose: {role: orchestrator, template: Templates/ADR.md}
+    fulfill:
+      - {stage: write_adr,       role: orchestrator, target: "ADRs/ADR-{{id}}.md"}
+      - {stage: link_services,   role: orchestrator}
+    gate: required
+
+  decision:
+    prep:
+      - {stage: frame_options,   role: orchestrator}
+    propose: {role: orchestrator, template: Templates/Decision.md}
+    fulfill:
+      - {stage: write_decision,  role: orchestrator, target: "Decisions/Decision-{{id}}.md"}
+    gate: required
+
+  session-finding:
+    prep:
+      - {stage: extract_pattern, role: orchestrator}
+    propose: {role: feedback-agent, template: "Session-Logs note"}
+    fulfill:
+      - {stage: append_to_session, role: orchestrator, target: "Session-Logs/{{date}}-session.md"}
+      - {stage: flag_feedback,     role: orchestrator}
+    gate: optional
+    auto_threshold: 60            # score ≥ 60 → auto-fulfill, else human gate
+
+  cleanup:
+    prep:
+      - {stage: confirm_issues,   role: orchestrator, tool: code-mapper}
+    propose: {role: service-agent, template: "Code-Map update"}
+    fulfill:
+      - {stage: write_code_map,  role: orchestrator, target: "Code-Maps/{{service}}-map.md"}
+    gate: optional
+    auto_threshold: 70
+
+  shelve:
+    auto: true
+    on_shelve:
+      - {stage: log_to_session, role: orchestrator, target: "Session-Logs/{{date}}-session.md (Shelved section)"}
+
+# ---------------------------------------------------------------------------
+# ROLES — map abstract roles to harness templates (markdown constitutions).
+# Each harness is a markdown file any agent can adopt.
+# Agent types per arXiv 2601.13671 §IV (Worker / Service / Support):
+#   - Worker   = executes a defined task (service-agent)
+#   - Service  = shared utility (code-mapper, knowledge-indexer, knowledge-sync)
+#   - Support  = meta-oversight, quality review (orchestrator, feedback-agent)
+# ---------------------------------------------------------------------------
+roles:
+  orchestrator:    Templates/Agent-Harness-Orchestrator.md    # type: Support
+  service-agent:   Templates/Agent-Harness-Service.md        # type: Worker
+  feedback-agent:  Templates/Agent-Harness-Feedback.md       # type: Support
+
+# ---------------------------------------------------------------------------
+# POLICIES — Layer 6 enforcement. Declarative rules for what the Orchestrator
+# is and is NOT allowed to do autonomously. Adapted from arXiv 2601.13671 §V-A
+# (Planning + Policy separation): planning decides WHAT to do (paths below),
+# policy decides WHAT IS PERMITTED. The gate enforces; this section defines
+# the rules the gate applies.
+# ---------------------------------------------------------------------------
+policies:
+
+  # --- Persistence: which vault writes require the gate ---
+  persistence:
+    gate_required_paths:
+      - Incidents/        # production-affecting, always human-confirmed
+      - ADRs/             # architecture decisions compound over time
+      - Decisions/        # even small decisions need traceable approval
+      - FIDUCIARY-MANDATE.md  # constitution changes need a vote
+    gate_optional_paths:
+      - Session-Logs/     # working memory, auto-append unless score < 40
+      - Code-Maps/        # auto-update when score >= 70 (cleanup path)
+      - Cross-Service/    # auto-update from REPO-MAP scan
+      - Skills/           # procedure updates, auto when score >= 50
+      - Projects/         # active work tracking, auto when score >= 40
+    auto_writable_paths:
+      - .sync-state.json
+      - .vector-index.json
+      - KANBAN-BOARD.md
+      - DASHBOARD.md
+      - .triage.yaml      # only on explicit orchestrator proposal (this file)
+
+  # --- Source control: git is sacred ---
+  git:
+    forbidden_without_verb:
+      - "git push --force"               # irreversible on shared branches
+      - "git push --force-with-lease"    # safer, still requires verb
+      - "git reset --hard"               # destructive on shared branches
+      - "git clean -fd"                  # deletes untracked files
+      - "git branch -D"                  # force delete without merge check
+    forbidden_always:
+      - "git push to main / master without explicit human verb"
+      - "git commit --amend on already-pushed commits"
+    requires_adr:
+      - "rewriting history of any shared branch"
+      - "changing .gitignore in ways that hide files from audit"
+
+  # --- Secrets & sensitive data ---
+  secrets:
+    never_write_to_vault:
+      - ".env files (any environment)"
+      - "API keys, tokens, passwords, OAuth secrets"
+      - "PII (real names, emails, phones tied to actual users)"
+      - "production database URLs with credentials embedded"
+    enforcement: "pre-commit scan + visual review at the gate"
+    on_violation: "shelve the proposal, redact from history if already written"
+
+  # --- Destructive operations ---
+  destructive:
+    requires_explicit_verb:
+      - "rm -rf on any path under TrueVow_Knowledge/"
+      - "drop, truncate, or DELETE FROM on any service database"
+      - "revoking user permissions or roles"
+      - "rotation of signing keys, API keys, OAuth secrets"
+      - "deleting vault files outside the gate (use shelve, not rm)"
+    confirmation_pattern: "orchestrator shows: target, blast radius, rollback plan"
+
+  # --- Production surface ---
+  production:
+    requires_explicit_verb:
+      - "modifying env vars on any deployed service"
+      - "deploying, restarting, or scaling production services"
+      - "changing DNS, CDN, routing, or load-balancer config"
+      - "changing rate limits, auth policies, or CORS settings"
+    blast_radius_check: "orchestrator must list affected services + estimated user count before proposal"
+
+  # --- Cross-service boundaries ---
+  cross_service:
+    requires_adr: "any change that touches 2+ services in one operation"
+    requires_in_session_log: "any service dependency change (new edge in service-dependency-map)"
+
+  # --- Audit trail ---
+  audit:
+    session_log_required: "every session ends with Session-Log flushed"
+    reindex_required: "every session that modifies vault runs sync-and-index.bat"
+    gate_record_required: "every gate decision recorded in session log (Path, Score, Target, Verdict)"
+
+  # --- Agent behavior ---
+  agents:
+    no_silent_writes: "agents must never write to gate_required_paths without proposal"
+    consult_before_acting: "agents read the vault before any non-trivial action"
+    log_inline: "agents log decisions as they happen, not batched at end of session"
+    no_hallucinated_paths: "agents verify file existence with Glob/Read before referencing"
+
+# ---------------------------------------------------------------------------
+# GATE — the single human approval point. Every proposal the Orchestrator
+# presents ends with one of these three verbs. Mirrors the Hermes pattern.
+#   approve:  write to vault, proceed to fulfill
+#   shelve:   log reason, do not write to vault, move on
+#   modify:   revise proposal, re-present at gate
+# Batch verb: shelve-all-except drops every awaiting_approval item except the
+# named slugs. Used in weekly feedback review.
+# ---------------------------------------------------------------------------
+gate:
+  verbs:
+    approve: "→ APPROVE — write to vault, proceed to fulfill"
+    shelve:  "→ SHELVE — log reason, do not write to vault, move on"
+    modify:  "→ MODIFY <change> — revise proposal, re-present at gate"
+  batch:
+    shelve_all_except: "→ SHELVE ALL EXCEPT <slugs> — drop everything but the named items"
+  reply_examples:
+    - "approve"
+    - "shelve — duplicate of Incident-001"
+    - "modify — bump severity to critical, link to ADR-003"
+    - "shelve all except ADR-004"
