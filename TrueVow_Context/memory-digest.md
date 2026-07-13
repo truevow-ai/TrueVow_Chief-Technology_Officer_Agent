@@ -3,8 +3,8 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-11T07:50:03.195088+00:00
-- Total memories: 160
+- Generated: 2026-07-13T01:00:21.983096+00:00
+- Total memories: 162
 
 ## High-importance decisions (8+, routine noise excluded) - 69
 
@@ -299,8 +299,12 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (80)
+## context (82)
 
+- **[7] [DONE] DONE: SETTLE: completed Exa top-8 enrichment (3 states done, runner resumable) + loaded gated carriers+age** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: completed Exa top-8 enrichment (3 states done, runner resumable) + loaded gated carriers+ages into DB | outcome: CA (4788 rows, +1070 enr, 284 carriers, 858 ages) and CL-FL (2914 rows, +564 enr, 338...
+  _by user - 2026-07-13_
+- **[7] Fly.io idle monitor activated — all 6 machines stopped** - Orchestrator now monitors Fly.io idle machines via monitor_fly_idle.py (checks every 10 min; stops machines idle >30 min). Initial cleanup: stopped 2 machines (intakely-backend + email-outreach-frontend) that had been running with zero activity since June 2 (39 days). All 6 machines across 3 apps (t...
+  _by yasha - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: built multi-source corroboration = machine verification (answer to no-human-verifier problem** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: built multi-source corroboration = machine verification (answer to no-human-verifier problem) | outcome: corroborate_verdicts.py promotes pending->verified ONLY when same case appears in >=2 indepen...
   _by user - 2026-07-11_
 - **[7] [DONE] DONE: SETTLE: full fiduciary security audit of every DB write path | outcome: archived 37 ungated scrapers** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "done", "status": "DONE", "message": "SETTLE: full fiduciary security audit of every DB write path | outcome: archived 37 ungated scrapers+feeders (preserved w/ README, not deleted); found+fixed the REAL gap - API service bulk_insert_verdicts +...
