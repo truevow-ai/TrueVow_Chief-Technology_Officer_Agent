@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-14T09:10:38.249855+00:00
-- Total memories: 171
+- Generated: 2026-07-14T10:03:29.655493+00:00
+- Total memories: 173
 
-## High-importance decisions (8+, routine noise excluded) - 76
+## High-importance decisions (8+, routine noise excluded) - 77
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -90,6 +90,8 @@
   _by user - 2026-06-25 - tags: saas-admin, hub, central, tenant-management, auth, database, architecture_
 - **[9][architecture] FM Service Wired to Ecosystem** - TrueVow_Financial_Management_Service is registered in the agent ecosystem with 13 domain agents (orchestrator, code-agent, search-agent, gl-agent, ar-agent, ap-agent, payroll-agent, treasury-agent, intercompany-agent, reporting-agent, affiliates-agent, benjamin-agent, fintech-patterns). Auto-dispatch routes FM-specific keywords (journal, invoice, payroll, treasury, intercompany, etc.) directly to the right domain agent SKILL.md.
   _by user - 2026-06-25 - tags: ecosystem, fm, financial-management, dispatch, integration, architecture_
+- **[9][decision] xai voice bridge SOLID (aa1a462) — remaining work is engine content** - Voice bridge now production-grade (test-1784022941612, 15 turns, committed aa1a462): greeting-prime fix (set context.current_node=greeting directly, fixes stuck-on-greeting), compliant greeting in workflow config (AI disclosure+recording+no-advice+no-A/C+human-path, spoken via force_message), monologue VAD (server_vad silence_duration_ms=2000 idle_timeout_ms=null) CONFIRMED applied via session.updated echo, ASR keyterms honoring xAI HARD LIMIT (20 terms x 20 chars, from keyword_loader.build_asr_keyterms). session.updated echo logging added. All voice-plumbing issues SOLVED: verbatim, advancing, compliant, monologue-survival, keyterms, no misroutes. REMAINING = separate WorkflowEngine CONTENT workstream (NOT bridge): frustrated-caller handling, transfer/speak-to-attorney requests, narrative acknowledgment vs rigid question ladder, interruption repair, terminal-node objection handling (cost/appointment/legal-advice). CONSOLE action still needed: disable 'Follow-up after silence' (idle_timeout 5000 injects empty turns). Test rig: :3023/demo/xai_cloud_test.html; reports in transcripts/{sid}-report.json.
+  _by Admin - 2026-07-14 - tags: -_
 - **[9][decision] xai_cloud bridge converted C->B (force_message, single-brain)** - ROOT CAUSE of xai_cloud conversation-quality failures (repetition loop, 'third time you said that'): Option C two-brain architecture. xAI ?model= + process_intake function tool let xAI's LLM compose its OWN reply AND our WorkflowEngine also drove -> they collided. FIX: converted to Option B. xAI = mouth+ears only (STT/VAD/TTS). WorkflowEngine = sole brain. Per turn: xAI input_audio_transcription -> _handle_user_turn -> engine.process_input(text) -> _force_message(prompt) delivered VERBATIM (item.type=force_message, NO response.create per xAI docs). Removed process_intake tool; instructions now minimal identity only + reasoning.effort=none. File: app/services/voice/bridges/xai_cloud_voice_agent/xai_cloud_voice_bridge.py. 40/40 tests pass.
   _by Admin - 2026-07-13 - tags: -_
 - **[9][decision] Multi-source corroboration as machine verification** - corroborate_verdicts.py: promote settle_verdicts pending->verified only when same case in >=2 independent sources (host-distinguished: static.case.law/CAP, courtlistener, morelaw) agree on amount within 1pct. Match key: shared reporter citation (from source_notes.official_citation) strongest, else normalized case_name+state+amount. 1249/12444 corroborated in dry-run. Disagreement (RJ Reynolds 20M vs 21M) / single-source / same-host-twice never promote. Records corroborating_sources evidence. Migration c0d1e2f3a4b5 + live promotion pending Supabase pooler recovery. This is the machine substitute for the not-yet-available human verifier; law-firm verification later layers ON TOP as a gold tier.
@@ -259,7 +261,7 @@
 - **[6] xai_cloud bridge test suite** - Created tests/test_xai_cloud_bridge.py (34 tests) for XaiCloudBridge. Mirrors test_xai_bridge.py but adapts for cloud bridge: dual registration (xai_cloud + xai_cloud_voice_agent), default voice rex (male-only), end_session returns {bridge,session_id,status} without had_audio, double-start early-ret...
   _by Admin - 2026-07-08_
 
-## decision (18)
+## decision (19)
 
 - **[10] xai intake: filler+verbatim+routing all FIXED (test-1784019219932)** - Test test-1784019219932 confirmed 3 MAJOR fixes working: (1) FILLER GONE — clean 'silent function-calling component' console prompt (NO Benjamin persona, NO 'tool is the voice', guardrail block DELETED) + reasoning.effort:none + minimal function_call_output (status only, NOT the wording) = ENGINE te...
   _by Admin - 2026-07-14_
@@ -279,6 +281,8 @@
   _by user - 2026-06-25_
 - **[10] CONNECT Archived - DRAFT Renamed to LEVERAGE - INTAKE Updated** - CONNECT (attorney referral network) is decommissioned and archived from the ecosystem permanently - no longer on TrueVow agenda. DRAFT has been completely replaced by LEVERAGE everywhere (same service, renamed). INTAKE (Tenant Application Service) is no longer just FSM NLP - it is now FSM applied to...
   _by user - 2026-06-25_
+- **[9] xai voice bridge SOLID (aa1a462) — remaining work is engine content** - Voice bridge now production-grade (test-1784022941612, 15 turns, committed aa1a462): greeting-prime fix (set context.current_node=greeting directly, fixes stuck-on-greeting), compliant greeting in workflow config (AI disclosure+recording+no-advice+no-A/C+human-path, spoken via force_message), monolo...
+  _by Admin - 2026-07-14_
 - **[9] xai_cloud bridge converted C->B (force_message, single-brain)** - ROOT CAUSE of xai_cloud conversation-quality failures (repetition loop, 'third time you said that'): Option C two-brain architecture. xAI ?model= + process_intake function tool let xAI's LLM compose its OWN reply AND our WorkflowEngine also drove -> they collided. FIX: converted to Option B. xAI = m...
   _by Admin - 2026-07-13_
 - **[9] Multi-source corroboration as machine verification** - corroborate_verdicts.py: promote settle_verdicts pending->verified only when same case in >=2 independent sources (host-distinguished: static.case.law/CAP, courtlistener, morelaw) agree on amount within 1pct. Match key: shared reporter citation (from source_notes.official_citation) strongest, else n...
@@ -325,8 +329,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (84)
+## context (85)
 
+- **[7] [DONE] DONE: INTAKE: xai voice bridge production-grade + committed aa1a462 | outcome: greeting-prime+compliant-gr** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xai voice bridge production-grade + committed aa1a462 | outcome: greeting-prime+compliant-greeting+monologue-VAD+keyterms(20x20)+session.updated-echo all verified working test-1784022941612 15-...
+  _by user - 2026-07-14_
 - **[7] [DONE] DONE: INTAKE: xai_cloud voice architecture SOLVED + committed (6c76ec4) | outcome: hosted-agent(agent_id)+** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xai_cloud voice architecture SOLVED + committed (6c76ec4) | outcome: hosted-agent(agent_id)+client-function-tool+force_message = single-brain verbatim voice intake WORKS. Filler gone, verbatim ...
   _by user - 2026-07-14_
 - **[7] [DONE] DONE: INTAKE: converted xai_cloud bridge Option C->B (force_message single-brain) to fix repetition-loop f** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: converted xai_cloud bridge Option C->B (force_message single-brain) to fix repetition-loop failures | outcome: engine is sole brain, xAI mouth+ears only, VQM+per-node-VAD+latency report wired, ...
