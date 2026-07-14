@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-14T10:03:29.655493+00:00
-- Total memories: 173
+- Generated: 2026-07-14T18:35:20.404991+00:00
+- Total memories: 178
 
-## High-importance decisions (8+, routine noise excluded) - 77
+## High-importance decisions (8+, routine noise excluded) - 80
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -90,6 +90,8 @@
   _by user - 2026-06-25 - tags: saas-admin, hub, central, tenant-management, auth, database, architecture_
 - **[9][architecture] FM Service Wired to Ecosystem** - TrueVow_Financial_Management_Service is registered in the agent ecosystem with 13 domain agents (orchestrator, code-agent, search-agent, gl-agent, ar-agent, ap-agent, payroll-agent, treasury-agent, intercompany-agent, reporting-agent, affiliates-agent, benjamin-agent, fintech-patterns). Auto-dispatch routes FM-specific keywords (journal, invoice, payroll, treasury, intercompany, etc.) directly to the right domain agent SKILL.md.
   _by user - 2026-06-25 - tags: ecosystem, fm, financial-management, dispatch, integration, architecture_
+- **[9][bug] contact_info_sequence dropped phone+email** - Root cause: routing INTO a sequence node used _execute_node, which returned the sequence's own intro prompt and left current_node=contact_info_sequence WITHOUT priming the first sub-node. Next turn the C10 terminal guard (workflow_engine.py:518) saw no next/branches/options and returned _build_complete_response — so name-only leads jumped to 'complete', losing phone+email. FIX: _execute_node now delegates type==sequence to _execute_sequence (primes contact_name, prepends intro to first question); terminal guards treat nodes/type==sequence as a valid exit. Verified: name->phone->email chain now runs.
+  _by Admin - 2026-07-14 - tags: -_
 - **[9][decision] xai voice bridge SOLID (aa1a462) — remaining work is engine content** - Voice bridge now production-grade (test-1784022941612, 15 turns, committed aa1a462): greeting-prime fix (set context.current_node=greeting directly, fixes stuck-on-greeting), compliant greeting in workflow config (AI disclosure+recording+no-advice+no-A/C+human-path, spoken via force_message), monologue VAD (server_vad silence_duration_ms=2000 idle_timeout_ms=null) CONFIRMED applied via session.updated echo, ASR keyterms honoring xAI HARD LIMIT (20 terms x 20 chars, from keyword_loader.build_asr_keyterms). session.updated echo logging added. All voice-plumbing issues SOLVED: verbatim, advancing, compliant, monologue-survival, keyterms, no misroutes. REMAINING = separate WorkflowEngine CONTENT workstream (NOT bridge): frustrated-caller handling, transfer/speak-to-attorney requests, narrative acknowledgment vs rigid question ladder, interruption repair, terminal-node objection handling (cost/appointment/legal-advice). CONSOLE action still needed: disable 'Follow-up after silence' (idle_timeout 5000 injects empty turns). Test rig: :3023/demo/xai_cloud_test.html; reports in transcripts/{sid}-report.json.
   _by Admin - 2026-07-14 - tags: -_
 - **[9][decision] xai_cloud bridge converted C->B (force_message, single-brain)** - ROOT CAUSE of xai_cloud conversation-quality failures (repetition loop, 'third time you said that'): Option C two-brain architecture. xAI ?model= + process_intake function tool let xAI's LLM compose its OWN reply AND our WorkflowEngine also drove -> they collided. FIX: converted to Option B. xAI = mouth+ears only (STT/VAD/TTS). WorkflowEngine = sole brain. Per turn: xAI input_audio_transcription -> _handle_user_turn -> engine.process_input(text) -> _force_message(prompt) delivered VERBATIM (item.type=force_message, NO response.create per xAI docs). Removed process_intake tool; instructions now minimal identity only + reasoning.effort=none. File: app/services/voice/bridges/xai_cloud_voice_agent/xai_cloud_voice_bridge.py. 40/40 tests pass.
@@ -144,10 +146,14 @@
   _by Admin - 2026-07-08 - tags: -_
 - **[8][bug] gitignore source-leak ECOSYSTEM AUDIT results (June 25) — which repos still affected** - Audited all sibling git repos for the gitignore source-leak (advisory 64bc43bf). NONE have run the fix yet (advisory just issued). CONFIRMED UNFIXED SOURCE LEAKS (real lib/ source hidden from git): TrueVow_Financial_Management_Service (frontend/lib + frontend/__tests__/lib), TrueVow_Tenant_Application_Service (app/portal/lib, dograh server ui/src/lib, scripts/lib), TrueVow-Tenant_Billing-Service (ui/lib; ALSO its .gitignore has an embedded NULL/control byte — corrupted). LATENT (dangerous unanchored lib/ rule present but no active source leak yet): TrueVow_Internal_Ops_Service, TrueVow_Tenant_SETTLE-Service, TrueVow_Tenant_LEVERAGE_Service. NOT GIT REPOS AT ALL (no version control — separate severe issue): TrueVow_Dialogflow_Intake_Service, TrueVow_Platform_Analytics_Service, TrueVow_Tenant_VERIFY_Service, TrueVow_TWIML_SoftPhone_App. CLEAN: Website, Customer_Success_CORE, First_Line_Support, Sales_Ops, Tenant_CONNECT, Customer_Portal, cartesia_test. SaaS_Admin already fixed. Each affected repo agent: run docs/01-main/ECOSYSTEM_ADVISORY_GITIGNORE_SOURCE_LEAK.md (in SaaS Admin).
   _by user - 2026-06-25 - tags: gitignore, audit, ecosystem, cross-service_
+- **[8][decision] xai transfer is channel-aware (SIP-only real handoff)** - Per xAI SIP docs: a REAL warm transfer requires SIP call_id + POST /v1/realtime/calls/{id}/refer (tel:/sip: target). The cloud demo (WebSocket + agent_id + force_message) has NO call_id and NO refer path, so it CANNOT live-transfer. Compliance: a legal AI implying 'connecting you to an attorney now' when it can't is misrepresentation. Phase 1 _build_transfer_response = honest CALLBACK: acknowledge + route into contact capture (reuses sequence fix) + fire_transfer_notification. Response carries forward-compatible action='callback'/target_uri so a future SIP bridge can refer without engine changes.
+  _by Admin - 2026-07-14 - tags: -_
 - **[8][decision] TRACE build decisions — storage pending Fly.io+Supabase spec amendment; billing recon uses temp fallback** - Resolved with product owner after reviewing revised TRACE-Technical-Implementation-Spec.md (1119 lines, 2026-07-08 11:02): (1) FLAG 1 STORAGE/AUDIT: The spec's [IMPLEMENTATION CHOICE] 'match your existing cloud' tables list only AWS/GCP/Azure, but verified TrueVow hosting is Fly.io + Docker + Supabase Postgres (fly.toml in Billing/SETTLE/TenantApp; aws-1-us-east-1.pooler.supabase.com; supabase>=2.0.0). No existing HIPAA-BAA object storage found. OWNER DECISION: owner will AMEND the spec's IMPLEMENTATION CHOICE tables to include Fly.io+Supabase before Phase 1A storage/audit is built. Phase 1A ON HOLD until amended spec lands. (2) FLAG 2 BILLING RECON: Verified FM/billing repos are corporate/SaaS finance (AR/AP/GL/treasury/payroll/intercompany + billing sync/webhook), NOT medical CPT/ICD-10. §5.6 premise 'billing repo owns CPT/ICD-10' is false for this codebase. OWNER DECISION: use the temporary spaCy CPT/ICD fallback from faxed BILLING docs, marked TODO, when §5.6 is eventually built (Phase 1D/4). (3) LOCKED: billing LLM = Azure OpenAI GPT-4o-mini; DeepSeek PROHIBITED any version (no BAA, China residency). (4) STILL BLOCKED: PRD §12 still lists 9 open questions, owner says 12 — awaiting updated PRD. Governance in force: locked-by-default, discretion only within [IMPLEMENTATION CHOICE], flag-and-wait, no unilateral resolution of §12.
   _by Admin - 2026-07-08 - tags: -_
 - **[8][decision] FM RLS canonical GUC + migration 010 staged** - Canonical RLS GUC for FM is app.current_tenant_id (set by app/core/database.py get_db_session). Migration 008 + compliance/001_rls_policies.sql wrongly use app.current_legal_entity_id (app never sets it). Staged migration 010_missing_tables_and_rls_fix creates approval_policy, reconciliation_adjustment_batch, treasury_sync_batch (had ORM models but no DDL anywhere) + tenant RLS, and fixes 008 treasury_bank_* RLS. Verified offline (py_compile + alembic history single head 009->010). NOT applied; DB down until 2026-06-26. Also fixed MockBillingAdapter NameError in ar billing_sync_routes.
   _by user - 2026-06-25 - tags: -_
+- **[8][pattern] WorkflowEngine global-intent layer (Phase 1)** - process_input now runs a single GLOBAL INTENTS block (turn>0) in locked priority: emergency -> transfer -> identity -> frustration -> ladder. New helpers: _detect_transfer_request (phrase-level w/ lawyer false-positive guard: suppresses 'I already have/hired an attorney','my brother is a lawyer'), _detect_identity_question (are you AI/human/robot, did you hire a human), _detect_frustration (not hearing me/didn't let me finish/keep asking). Identity+frustration re-ask current node via _build_reask_response (no advance). Frustration escape counter: 2 hits at same node -> escalate to callback. Redundant 2nd transfer/emergency block removed. 40/40 test_xai_cloud_bridge.py pass.
+  _by Admin - 2026-07-14 - tags: -_
 - **[8][pattern] xai_cloud VQM + per-node VAD + latency payload** - xai_cloud bridge now uses shared VoiceQualityMonitor (app/services/voice/quality_monitor.py) like Dograh: start_session on bridge.start_session, WorkflowEvent+LatencyEvent(stage=workflow) per turn, LatencyEvent(stage=total) on first audio (TTFA), end_session builds report. Report saved to transcripts/{sid}-report.json with: metrics(connect_to_xai_ms, greeting_ttfa_ms, turn_ttfas_ms, avg), per-turn breakdown (workflow_ms=our-machine engine compute, ttfa_ms=total, transport_plus_provider_ms=ttfa-workflow=2 network hops+xAI STT/TTS overhead), vqm score, vqm_workflow_report. Per-node VAD: _vad_for_node() -> _VAD_STRUCTURED (2000ms silence) for email/phone/name nodes, _VAD_DEFAULT else; applied dynamically via session.update after each turn. Frontend app/web/xai_cloud_test.html rebuilt: End Call button, realtime event log w/ ms deltas, VQM tile, download report. TROUBLESHOOT FROM: transcripts/{sid}-report.json (authoritative, has node decisions); xAI playground logs only for STT/TTS fidelity cross-check.
   _by Admin - 2026-07-13 - tags: -_
 - **[8][pattern] Voice Bridge Latency Budget** - All voice bridges (Cartesia, Deepgram, telephony) must complete FSM state transitions within 500ms. Cartesia TTS streaming should begin within 150ms of chunk receipt. Bridge adapter pattern: each bridge implements a common Adapter interface (connect, stream, disconnect). FSM orchestrator routes to active bridge based on availability and cost.
@@ -252,8 +258,10 @@
 - **[6] LedgerPoster seam boundary: do not swap GL route CRUD** - journal_entry_routes.py posting/reversal/draft paths already use get_ledger_poster() (lines 59/185/259). The 6 remaining JournalEntryService(db) sites only use entry_repo/line_repo, bulk_upsert_lines, and _validate_required_dimensions, which the LedgerPoster Protocol intentionally excludes. Do NOT r...
   _by user - 2026-06-25_
 
-## pattern (3)
+## pattern (4)
 
+- **[8] WorkflowEngine global-intent layer (Phase 1)** - process_input now runs a single GLOBAL INTENTS block (turn>0) in locked priority: emergency -> transfer -> identity -> frustration -> ladder. New helpers: _detect_transfer_request (phrase-level w/ lawyer false-positive guard: suppresses 'I already have/hired an attorney','my brother is a lawyer'), _...
+  _by Admin - 2026-07-14_
 - **[8] xai_cloud VQM + per-node VAD + latency payload** - xai_cloud bridge now uses shared VoiceQualityMonitor (app/services/voice/quality_monitor.py) like Dograh: start_session on bridge.start_session, WorkflowEvent+LatencyEvent(stage=workflow) per turn, LatencyEvent(stage=total) on first audio (TTFA), end_session builds report. Report saved to transcript...
   _by Admin - 2026-07-13_
 - **[8] Voice Bridge Latency Budget** - All voice bridges (Cartesia, Deepgram, telephony) must complete FSM state transitions within 500ms. Cartesia TTS streaming should begin within 150ms of chunk receipt. Bridge adapter pattern: each bridge implements a common Adapter interface (connect, stream, disconnect). FSM orchestrator routes to a...
@@ -261,7 +269,7 @@
 - **[6] xai_cloud bridge test suite** - Created tests/test_xai_cloud_bridge.py (34 tests) for XaiCloudBridge. Mirrors test_xai_bridge.py but adapts for cloud bridge: dual registration (xai_cloud + xai_cloud_voice_agent), default voice rex (male-only), end_session returns {bridge,session_id,status} without had_audio, double-start early-ret...
   _by Admin - 2026-07-08_
 
-## decision (19)
+## decision (20)
 
 - **[10] xai intake: filler+verbatim+routing all FIXED (test-1784019219932)** - Test test-1784019219932 confirmed 3 MAJOR fixes working: (1) FILLER GONE — clean 'silent function-calling component' console prompt (NO Benjamin persona, NO 'tool is the voice', guardrail block DELETED) + reasoning.effort:none + minimal function_call_output (status only, NOT the wording) = ENGINE te...
   _by Admin - 2026-07-14_
@@ -295,6 +303,8 @@
   _by Admin - 2026-07-03_
 - **[9] CONNECT Service Deleted** - TrueVow_Tenant_CONNECT_Service directory deleted. Removed from config.yaml services block and .gitignore. Was archived June 2026 — attorney referral network, no longer on TrueVow's agenda.
   _by user - 2026-07-01_
+- **[8] xai transfer is channel-aware (SIP-only real handoff)** - Per xAI SIP docs: a REAL warm transfer requires SIP call_id + POST /v1/realtime/calls/{id}/refer (tel:/sip: target). The cloud demo (WebSocket + agent_id + force_message) has NO call_id and NO refer path, so it CANNOT live-transfer. Compliance: a legal AI implying 'connecting you to an attorney now'...
+  _by Admin - 2026-07-14_
 - **[8] TRACE build decisions — storage pending Fly.io+Supabase spec amendment; billing recon uses temp fallback** - Resolved with product owner after reviewing revised TRACE-Technical-Implementation-Spec.md (1119 lines, 2026-07-08 11:02): (1) FLAG 1 STORAGE/AUDIT: The spec's [IMPLEMENTATION CHOICE] 'match your existing cloud' tables list only AWS/GCP/Azure, but verified TrueVow hosting is Fly.io + Docker + Supaba...
   _by Admin - 2026-07-08_
 - **[8] FM RLS canonical GUC + migration 010 staged** - Canonical RLS GUC for FM is app.current_tenant_id (set by app/core/database.py get_db_session). Migration 008 + compliance/001_rls_policies.sql wrongly use app.current_legal_entity_id (app never sets it). Staged migration 010_missing_tables_and_rls_fix creates approval_policy, reconciliation_adjustm...
@@ -302,7 +312,7 @@
 - **[4] All 18 Active Services Wired to Ecosystem + 1 Archived** - 18 of 18 active TrueVow services wired with AGENTS.md + ecosystem integration. 1 archived: CONNECT (decommissioned June 2026, no longer on TrueVow agenda). Every agent opening any active service reads ecosystem preamble: check in with CTO orchestrator, dispatch tasks, remember decisions, report stat...
   _by user - 2026-06-25_
 
-## bug (12)
+## bug (13)
 
 - **[10] settle_verdicts table never existed + bulk_insert had no validation** - CRITICAL for a legal-data product: (1) settle_verdicts + settle_verdict_scrape_jobs tables were never migrated - all prior loads 404'd, zero data persisted. (2) app/services/verdict_search.py bulk_insert_verdicts inserts raw dicts with NO validation. (3) scraped enrichment vocab did NOT match DB enu...
   _by Admin - 2026-07-09_
@@ -312,6 +322,8 @@
   _by Admin - 2026-07-07_
 - **[10] Gitignore Source-Leak FIXED — All 6 services** - All 6 affected services now have anchored .gitignore patterns. lib/, env/, venv/, build/, dist/ now use leading / to prevent accidental source file hiding. Leaked PowerShell commands removed from FM, Billing, and LEVERAGE. SETTLE test_db_conn.py and recover_pyc.py anchored to root only. Internal Ops...
   _by Admin - 2026-07-01_
+- **[9] contact_info_sequence dropped phone+email** - Root cause: routing INTO a sequence node used _execute_node, which returned the sequence's own intro prompt and left current_node=contact_info_sequence WITHOUT priming the first sub-node. Next turn the C10 terminal guard (workflow_engine.py:518) saw no next/branches/options and returned _build_compl...
+  _by Admin - 2026-07-14_
 - **[8] naic_complaints queried wrong Socrata dataset** - scripts/scraping-factory/insurance-carrier/naic_complaints.py filtered by 'naic' column on the raw records dataset jjc8-mxkg which has NO carrier column (HTTP 400). Fixed to use complaint-index dataset pa9u-9s9w with naic_id/year/col1-3. Verified real data.
   _by Admin - 2026-07-08_
 - **[8] Carrier extractor captured sentence fragments** - settle_data_scraping_factory/_common/enrich.py _INSURANCE_RE used greedy IGNORECASE [A-Z] and captured whole sentences as insurance_carrier. 86% (3547/4104) of carrier values were garbage. Fixed with known-carrier registry + strict proper-noun+suffix pattern + is_valid_carrier/clean_carrier validato...
@@ -329,8 +341,12 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (85)
+## context (87)
 
+- **[7] [DONE] DONE: INTAKE: Phase 1 global intents + Phase 1B contact-capture redesign | committed 895cc37 | outcome: 11** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: Phase 1 global intents + Phase 1B contact-capture redesign | committed 895cc37 | outcome: 11 fixes delivered (global intents: transfer/identity/frustration/goodbye + contact: first/last split, ...
+  _by user - 2026-07-14_
+- **[7] [ACTIVE] START: INTAKE: WorkflowEngine dialogue-logic redesign (global intents, frustration repair, off-answer re-as** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "start", "status": "ACTIVE", "message": "INTAKE: WorkflowEngine dialogue-logic redesign (global intents, frustration repair, off-answer re-ask, terminal off-ramps) | resuming from aa1a462 voice bridge SOLID | goal: engine handles caller in...
+  _by user - 2026-07-14_
 - **[7] [DONE] DONE: INTAKE: xai voice bridge production-grade + committed aa1a462 | outcome: greeting-prime+compliant-gr** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xai voice bridge production-grade + committed aa1a462 | outcome: greeting-prime+compliant-greeting+monologue-VAD+keyterms(20x20)+session.updated-echo all verified working test-1784022941612 15-...
   _by user - 2026-07-14_
 - **[7] [DONE] DONE: INTAKE: xai_cloud voice architecture SOLVED + committed (6c76ec4) | outcome: hosted-agent(agent_id)+** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xai_cloud voice architecture SOLVED + committed (6c76ec4) | outcome: hosted-agent(agent_id)+client-function-tool+force_message = single-brain verbatim voice intake WORKS. Filler gone, verbatim ...
