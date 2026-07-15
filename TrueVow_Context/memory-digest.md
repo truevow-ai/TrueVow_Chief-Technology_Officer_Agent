@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-14T18:35:20.404991+00:00
-- Total memories: 178
+- Generated: 2026-07-15T03:14:31.876151+00:00
+- Total memories: 180
 
-## High-importance decisions (8+, routine noise excluded) - 80
+## High-importance decisions (8+, routine noise excluded) - 81
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -60,6 +60,8 @@
   _by user - 2026-06-25 - tags: oss-tools, chatwoot, mattermost, novu, posthog, replacement, archive_
 - **[10][decision] CONNECT Archived - DRAFT Renamed to LEVERAGE - INTAKE Updated** - CONNECT (attorney referral network) is decommissioned and archived from the ecosystem permanently - no longer on TrueVow agenda. DRAFT has been completely replaced by LEVERAGE everywhere (same service, renamed). INTAKE (Tenant Application Service) is no longer just FSM NLP - it is now FSM applied to various voice orchestration bridges, a multi-bridge voice orchestration platform. VERIFY, SETTLE, Customer Portal, and Platform Analytics remain unchanged.
   _by user - 2026-06-25 - tags: decision, archive, connect, draft, leverage, intake, voice-orchestration, rename_
+- **[9][architecture] llm_contact hybrid capture mode committed (a588904)** - Hybrid architecture: rigid engine + force_message for intake ladder, Grok drives contact phase via session.update with submit_contact_info tool. Engine returns mode='llm_contact' when ladder routes to contact_info_sequence. Bridge swaps instructions/tools mid-session. Contact rules: no examples, letter-by-letter spelling, 10-digit phone required, 2-strikes skip for name/email, phone-only partial leads accepted. Grok validates phone digits before confirming. submit_contact_info dispatched alongside get_next_intake_question. Intake ladder unchanged.
+  _by Admin - 2026-07-15 - tags: -_
 - **[9][architecture] Platform Identity and ID Contract (ADR-005) - BINDING on all services** - Cross-service ID audit (SaaS Admin, INTAKE, TRACE, SETTLE, Billing) found TRACE/SETTLE/Billing mint their own case_id and diverge on firm identity type instead of inheriting canonical IDs from SaaS Admin MDM. Canonical contract per ADR-005: Firm=clerk_org_id TEXT (Clerk org_*), User=clerk_user_id TEXT, Case=mdm_cases.case_id UUID (MDM is sole minter; others reference), Client=contact_id UUID (MDM contacts), CRM=crm_matter_id TEXT (SaaS Admin sync). Five binding rules: (1) only MDM mints case_id; (2) firm id is clerk_org_id TEXT never UUID-cast (Security Contract v1, migration 118); (3) contact_id travels alongside TRACE opaque client_token as the non-PHI cross-service client key; (4) mdm_events_outbox fans INTAKE->MDM->TRACE/SETTLE/Billing; (5) CRM matter_id propagates from SaaS Admin. TRACE migration (PLANNED, NOT executed): firm_id UUID -> clerk_org_id TEXT (RLS+FK+API+JWT claim reads), add mdm_case_id UUID nullable (keep local case_id as internal surrogate), add contact_id UUID nullable, and INTAKE CaseCreated outbox MUST be wired to MDM before TRACE prod. ADR-005 draft at TrueVow_Tenant_TRACE_Service/docs/00-Planning. Status: pending review; zero schema changes made.
   _by Admin - 2026-07-10 - tags: -_
 - **[9][architecture] Phase 2.5 Writeback Enforcement COMPLETE - all 14 services wired** - Completed the pending orchestrator task from AGENT-OS-PLAN-REVISED.md Phase 2.5. WRITEBACK PROTOCOL section now present in all 14 service AGENTS.md files (previously only 3: Sales Ops, SETTLE, LEVERAGE). Added canonical mandatory preamble (start/during/end/blocked checkin commands + pipe-delimited writeback format) to: FM, SaaS Admin, INTAKE/Tenant App, Customer Portal, VERIFY, CSM, Internal Ops, Analytics, Billing, SoftPhone. Created new AGENTS.md for TrueVow_Tenant_TRACE_Service (had none). Also fixed config.yaml bug: TRACE service key/path was TrueVow_TRACE_Services but real dir is TrueVow_Tenant_TRACE_Service - was showing MISSING on dashboard, now resolves to DIRTY. FM's large existing preamble preserved by inserting writeback block right after the H1 title.
@@ -169,7 +171,7 @@
 - **[8][todo] FIX gitignore source-leak: TrueVow-Tenant_Billing-Service** - ASSIGNED to the TrueVow-Tenant_Billing-Service agent. Real lib/ source is currently hidden from git (confirmed). Run the playbook: TrueVow_SaaS_Administration_Service/docs/01-main/ECOSYSTEM_ADVISORY_GITIGNORE_SOURCE_LEAK.md (fix .gitignore: anchor/remove stray lib/ + logs/; secrets-scan; commit recovered source in reviewed batches by explicit path; verify clean-clone build). REPORT RESULT via memory.py remember category=bug title='TrueVow-Tenant_Billing-Service gitignore RESULT' content='FIXED n files | CLEAN | BLOCKED + reason; secrets found?'. NOTE: reporting.py agent-checkin is broken — report via memory.
   _by user - 2026-06-25 - tags: gitignore, todo, assigned_
 
-## architecture (43)
+## architecture (44)
 
 - **[10] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on...
   _by Admin - 2026-07-07_
@@ -197,6 +199,8 @@
   _by user - 2026-06-25_
 - **[10] LEVERAGE (ex-DRAFT) — 3-Tier Rules Engine, NO AI** - LEVERAGE is a 3-tier legal rule validation system: TIER 1: State/Jurisdiction rules (mandatory, cannot be disabled). TIER 2: Practice Area rules (customizable). TIER 3: Firm/Attorney/Client-specific rules. CORE PRINCIPLE: NO AI — no machine learning, no neural networks, no LLM. Uses peer benchmarkin...
   _by user - 2026-06-25_
+- **[9] llm_contact hybrid capture mode committed (a588904)** - Hybrid architecture: rigid engine + force_message for intake ladder, Grok drives contact phase via session.update with submit_contact_info tool. Engine returns mode='llm_contact' when ladder routes to contact_info_sequence. Bridge swaps instructions/tools mid-session. Contact rules: no examples, let...
+  _by Admin - 2026-07-15_
 - **[9] Platform Identity and ID Contract (ADR-005) - BINDING on all services** - Cross-service ID audit (SaaS Admin, INTAKE, TRACE, SETTLE, Billing) found TRACE/SETTLE/Billing mint their own case_id and diverge on firm identity type instead of inheriting canonical IDs from SaaS Admin MDM. Canonical contract per ADR-005: Firm=clerk_org_id TEXT (Clerk org_*), User=clerk_user_id TE...
   _by Admin - 2026-07-10_
 - **[9] Phase 2.5 Writeback Enforcement COMPLETE - all 14 services wired** - Completed the pending orchestrator task from AGENT-OS-PLAN-REVISED.md Phase 2.5. WRITEBACK PROTOCOL section now present in all 14 service AGENTS.md files (previously only 3: Sales Ops, SETTLE, LEVERAGE). Added canonical mandatory preamble (start/during/end/blocked checkin commands + pipe-delimited w...
@@ -312,7 +316,7 @@
 - **[4] All 18 Active Services Wired to Ecosystem + 1 Archived** - 18 of 18 active TrueVow services wired with AGENTS.md + ecosystem integration. 1 archived: CONNECT (decommissioned June 2026, no longer on TrueVow agenda). Every agent opening any active service reads ecosystem preamble: check in with CTO orchestrator, dispatch tasks, remember decisions, report stat...
   _by user - 2026-06-25_
 
-## bug (13)
+## bug (14)
 
 - **[10] settle_verdicts table never existed + bulk_insert had no validation** - CRITICAL for a legal-data product: (1) settle_verdicts + settle_verdict_scrape_jobs tables were never migrated - all prior loads 404'd, zero data persisted. (2) app/services/verdict_search.py bulk_insert_verdicts inserts raw dicts with NO validation. (3) scraped enrichment vocab did NOT match DB enu...
   _by Admin - 2026-07-09_
@@ -334,6 +338,8 @@
   _by Admin - 2026-07-08_
 - **[8] gitignore source-leak ECOSYSTEM AUDIT results (June 25) — which repos still affected** - Audited all sibling git repos for the gitignore source-leak (advisory 64bc43bf). NONE have run the fix yet (advisory just issued). CONFIRMED UNFIXED SOURCE LEAKS (real lib/ source hidden from git): TrueVow_Financial_Management_Service (frontend/lib + frontend/__tests__/lib), TrueVow_Tenant_Applicati...
   _by user - 2026-06-25_
+- **[7] edge cases in identity, frustration, goodbye handlers (now fixed)** - Comprehensive edge case testing revealed coverage gaps: identity handler missed 'is anyone actually there' and 'who am I talking to', frustration had a FALSE POSITIVE on 'the same thing happened to my sister' and missed 8 phrasings ('taking forever','wasting my time','I have had enough','just stop' ...
+  _by Admin - 2026-07-14_
 - **[7] Known-carrier registry over-matched ordinary words in opinion prose** - extract_carrier's known-carrier list matched homonyms in full opinion text: 'the general rule', 'travelers on the highway', 'nationwide', 'progressive disease', 'Hartford CT'. On 2901 CL records this produced 507 fake 'The General', 234 'The Hartford' etc. Fix: _AMBIGUOUS_CARRIERS set gated by _carr...
   _by Admin - 2026-07-09_
 - **[7] Fixed obsidian-bridge.py Windows-filename crash (orchestration tooling)** - obsidian-bridge.py built Obsidian filenames from memory/session titles but only stripped / and \ — any title containing a Windows-illegal char (: ? * " < > |) threw OSError [Errno 22] and crashed the ENTIRE ecosystem knowledge-sync on Windows (e.g. a title ending "active: me"). Fix: added safe_filen...
