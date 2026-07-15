@@ -3,8 +3,8 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-15T05:58:56.339042+00:00
-- Total memories: 181
+- Generated: 2026-07-15T21:46:25.108984+00:00
+- Total memories: 182
 
 ## High-importance decisions (8+, routine noise excluded) - 82
 
@@ -354,8 +354,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (87)
+## context (88)
 
+- **[7] [DONE] DONE: INTAKE: xAI+Cartesia voice bridges production-grade, workflow coordination model established | outco** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xAI+Cartesia voice bridges production-grade, workflow coordination model established | outcome: xAI single-brain hosting+tool+force_message verified 40/40 tests; Cartesia compliant greeting+pri...
+  _by user - 2026-07-15_
 - **[7] [DONE] DONE: INTAKE: Phase 1 global intents + Phase 1B contact-capture redesign | committed 895cc37 | outcome: 11** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: Phase 1 global intents + Phase 1B contact-capture redesign | committed 895cc37 | outcome: 11 fixes delivered (global intents: transfer/identity/frustration/goodbye + contact: first/last split, ...
   _by user - 2026-07-14_
 - **[7] [ACTIVE] START: INTAKE: WorkflowEngine dialogue-logic redesign (global intents, frustration repair, off-answer re-as** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "start", "status": "ACTIVE", "message": "INTAKE: WorkflowEngine dialogue-logic redesign (global intents, frustration repair, off-answer re-ask, terminal off-ramps) | resuming from aa1a462 voice bridge SOLID | goal: engine handles caller in...
