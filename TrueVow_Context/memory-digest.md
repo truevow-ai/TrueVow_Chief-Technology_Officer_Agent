@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-15T03:14:31.876151+00:00
-- Total memories: 180
+- Generated: 2026-07-15T05:58:56.339042+00:00
+- Total memories: 181
 
-## High-importance decisions (8+, routine noise excluded) - 81
+## High-importance decisions (8+, routine noise excluded) - 82
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -42,6 +42,8 @@
   _by Admin - 2026-07-07 - tags: -_
 - **[10][bug] Gitignore Source-Leak FIXED — All 6 services** - All 6 affected services now have anchored .gitignore patterns. lib/, env/, venv/, build/, dist/ now use leading / to prevent accidental source file hiding. Leaked PowerShell commands removed from FM, Billing, and LEVERAGE. SETTLE test_db_conn.py and recover_pyc.py anchored to root only. Internal Ops, SETTLE, and LEVERAGE latent rules also fixed.
   _by Admin - 2026-07-01 - tags: -_
+- **[10][convention] zero hardcoded tunable values** - RULE: This is a multi-tenant platform. Never hardcode ANY value that may need adjustment per-tenant, per-firm, or per-environment. All tunables must live in one of: (1) tenant_config, (2) workflow JSON config, or (3) named module-level constants with clear documentation. Bare numbers, strings, or IDs in logic statements are FORBIDDEN. If you need a value that could change — threshold, timeout, limit, firm identifier, VAD setting, confidence score — expose it via config. Test by asking: 'Could a different law firm need this set differently?'
+  _by Admin - 2026-07-15 - tags: -_
 - **[10][decision] xai intake: filler+verbatim+routing all FIXED (test-1784019219932)** - Test test-1784019219932 confirmed 3 MAJOR fixes working: (1) FILLER GONE — clean 'silent function-calling component' console prompt (NO Benjamin persona, NO 'tool is the voice', guardrail block DELETED) + reasoning.effort:none + minimal function_call_output (status only, NOT the wording) = ENGINE text spoken BYTE-FOR-BYTE verbatim every turn, zero 'I'll get the next question'. (2) PROPERTY-DAMAGE MISROUTE fixed — _check_context_reroute in workflow_engine.py L2333 now scoped to EARLY_REROUTE_NODES (identify_practice_area + *_jurisdiction only), so 'no injuries' mid-intake no longer rejects valid slip-fall caller. (3) MIC-GATE tied to playback state not fragile timer. REMAINING: (A) empty user_text idle re-fires re-spoke same line 2-3x — JUST FIXED with empty-input no-op guard (silent function_call_output, no force_message, when user_text empty after turn 1). (B) workflow CONTENT coherence — Oakwood config misread 'about to happen/future hazard' as workplace-injury path asking about existing injuries; that's a config-design issue separate from bridge. Console prompt (final): 'You are a silent function-calling component... only call get_next_intake_question... never produce user-visible language.' Legal disclaimers/transfer/AI-disclosure must move INTO WorkflowEngine force_message lines (better for legal audit). NOT committed yet.
   _by Admin - 2026-07-14 - tags: -_
 - **[10][decision] xai hosted-agent + force_message = VERBATIM delivery WORKS** - MILESTONE (test-1784016779016, 19 turns): force_message delivers engine prompts BYTE-FOR-BYTE verbatim. Confirmed AGENT_SPOKE == ENGINE for every node (In what city..., What caused you to slip..., etc). Full coherent intake flow completed greeting->conflict->practice_area->slip_fall->jurisdiction->hazard->witnesses->injuries->contact. Architecture PROVEN: (1) response.function_call_arguments.done -> (2) run WorkflowEngine -> (3) conversation.item.create function_call_output (state) -> (4) conversation.item.create force_message with engine text (verbatim TTS) -> (5) NO response.create. Single-brain achieved: engine decides + force_message speaks. ONLY remaining issue: agent narrates 'I'll get the next question for you' BEFORE calling tool = pre-tool filler, which is a CONSOLE PROMPT problem (not code) per xAI docs — force_message can't stop pre-tool narration. Fix: console agent prompt must say 'You produce ZERO words of your own, never narrate/announce tool calls'. Bridge file complete in xai_cloud_voice_bridge.py open()+_handle_tool_call(). NOT committed yet.
@@ -315,6 +317,11 @@
   _by user - 2026-06-25_
 - **[4] All 18 Active Services Wired to Ecosystem + 1 Archived** - 18 of 18 active TrueVow services wired with AGENTS.md + ecosystem integration. 1 archived: CONNECT (decommissioned June 2026, no longer on TrueVow agenda). Every agent opening any active service reads ecosystem preamble: check in with CTO orchestrator, dispatch tasks, remember decisions, report stat...
   _by user - 2026-06-25_
+
+## convention (1)
+
+- **[10] zero hardcoded tunable values** - RULE: This is a multi-tenant platform. Never hardcode ANY value that may need adjustment per-tenant, per-firm, or per-environment. All tunables must live in one of: (1) tenant_config, (2) workflow JSON config, or (3) named module-level constants with clear documentation. Bare numbers, strings, or ID...
+  _by Admin - 2026-07-15_
 
 ## bug (14)
 
