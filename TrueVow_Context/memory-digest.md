@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-15T21:46:25.108984+00:00
-- Total memories: 182
+- Generated: 2026-07-16T08:54:37.155297+00:00
+- Total memories: 184
 
-## High-importance decisions (8+, routine noise excluded) - 82
+## High-importance decisions (8+, routine noise excluded) - 83
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -62,6 +62,8 @@
   _by user - 2026-06-25 - tags: oss-tools, chatwoot, mattermost, novu, posthog, replacement, archive_
 - **[10][decision] CONNECT Archived - DRAFT Renamed to LEVERAGE - INTAKE Updated** - CONNECT (attorney referral network) is decommissioned and archived from the ecosystem permanently - no longer on TrueVow agenda. DRAFT has been completely replaced by LEVERAGE everywhere (same service, renamed). INTAKE (Tenant Application Service) is no longer just FSM NLP - it is now FSM applied to various voice orchestration bridges, a multi-bridge voice orchestration platform. VERIFY, SETTLE, Customer Portal, and Platform Analytics remain unchanged.
   _by user - 2026-06-25 - tags: decision, archive, connect, draft, leverage, intake, voice-orchestration, rename_
+- **[9][architecture] workflow co-ownership model for bridge agents** - While the canonical workflow template is still under active development, a sequential-edit protocol applies: ONE designated agent edits personal_injury_speech.json + workflow_engine.py at a time. Bridge agents work on bridge files only. If they need engine/workflow changes, they log a [TODO] in PROGRESS_LOG. The active workflow agent implements it. Ownership is tracked via PROGRESS_LOG entries: [ACTIVE] workflow_owner: <agent> at session start, [DONE] workflow session complete when done. Per-firm customization is the SaaS admin's domain — bridge agents never customize per-tenant. When the template is production-ready, it will be frozen READ-ONLY for all bridge agents.
+  _by Admin - 2026-07-16 - tags: -_
 - **[9][architecture] llm_contact hybrid capture mode committed (a588904)** - Hybrid architecture: rigid engine + force_message for intake ladder, Grok drives contact phase via session.update with submit_contact_info tool. Engine returns mode='llm_contact' when ladder routes to contact_info_sequence. Bridge swaps instructions/tools mid-session. Contact rules: no examples, letter-by-letter spelling, 10-digit phone required, 2-strikes skip for name/email, phone-only partial leads accepted. Grok validates phone digits before confirming. submit_contact_info dispatched alongside get_next_intake_question. Intake ladder unchanged.
   _by Admin - 2026-07-15 - tags: -_
 - **[9][architecture] Platform Identity and ID Contract (ADR-005) - BINDING on all services** - Cross-service ID audit (SaaS Admin, INTAKE, TRACE, SETTLE, Billing) found TRACE/SETTLE/Billing mint their own case_id and diverge on firm identity type instead of inheriting canonical IDs from SaaS Admin MDM. Canonical contract per ADR-005: Firm=clerk_org_id TEXT (Clerk org_*), User=clerk_user_id TEXT, Case=mdm_cases.case_id UUID (MDM is sole minter; others reference), Client=contact_id UUID (MDM contacts), CRM=crm_matter_id TEXT (SaaS Admin sync). Five binding rules: (1) only MDM mints case_id; (2) firm id is clerk_org_id TEXT never UUID-cast (Security Contract v1, migration 118); (3) contact_id travels alongside TRACE opaque client_token as the non-PHI cross-service client key; (4) mdm_events_outbox fans INTAKE->MDM->TRACE/SETTLE/Billing; (5) CRM matter_id propagates from SaaS Admin. TRACE migration (PLANNED, NOT executed): firm_id UUID -> clerk_org_id TEXT (RLS+FK+API+JWT claim reads), add mdm_case_id UUID nullable (keep local case_id as internal surrogate), add contact_id UUID nullable, and INTAKE CaseCreated outbox MUST be wired to MDM before TRACE prod. ADR-005 draft at TrueVow_Tenant_TRACE_Service/docs/00-Planning. Status: pending review; zero schema changes made.
@@ -173,7 +175,7 @@
 - **[8][todo] FIX gitignore source-leak: TrueVow-Tenant_Billing-Service** - ASSIGNED to the TrueVow-Tenant_Billing-Service agent. Real lib/ source is currently hidden from git (confirmed). Run the playbook: TrueVow_SaaS_Administration_Service/docs/01-main/ECOSYSTEM_ADVISORY_GITIGNORE_SOURCE_LEAK.md (fix .gitignore: anchor/remove stray lib/ + logs/; secrets-scan; commit recovered source in reviewed batches by explicit path; verify clean-clone build). REPORT RESULT via memory.py remember category=bug title='TrueVow-Tenant_Billing-Service gitignore RESULT' content='FIXED n files | CLEAN | BLOCKED + reason; secrets found?'. NOTE: reporting.py agent-checkin is broken — report via memory.
   _by user - 2026-06-25 - tags: gitignore, todo, assigned_
 
-## architecture (44)
+## architecture (45)
 
 - **[10] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on...
   _by Admin - 2026-07-07_
@@ -201,6 +203,8 @@
   _by user - 2026-06-25_
 - **[10] LEVERAGE (ex-DRAFT) — 3-Tier Rules Engine, NO AI** - LEVERAGE is a 3-tier legal rule validation system: TIER 1: State/Jurisdiction rules (mandatory, cannot be disabled). TIER 2: Practice Area rules (customizable). TIER 3: Firm/Attorney/Client-specific rules. CORE PRINCIPLE: NO AI — no machine learning, no neural networks, no LLM. Uses peer benchmarkin...
   _by user - 2026-06-25_
+- **[9] workflow co-ownership model for bridge agents** - While the canonical workflow template is still under active development, a sequential-edit protocol applies: ONE designated agent edits personal_injury_speech.json + workflow_engine.py at a time. Bridge agents work on bridge files only. If they need engine/workflow changes, they log a [TODO] in PROG...
+  _by Admin - 2026-07-16_
 - **[9] llm_contact hybrid capture mode committed (a588904)** - Hybrid architecture: rigid engine + force_message for intake ladder, Grok drives contact phase via session.update with submit_contact_info tool. Engine returns mode='llm_contact' when ladder routes to contact_info_sequence. Bridge swaps instructions/tools mid-session. Contact rules: no examples, let...
   _by Admin - 2026-07-15_
 - **[9] Platform Identity and ID Contract (ADR-005) - BINDING on all services** - Cross-service ID audit (SaaS Admin, INTAKE, TRACE, SETTLE, Billing) found TRACE/SETTLE/Billing mint their own case_id and diverge on firm identity type instead of inheriting canonical IDs from SaaS Admin MDM. Canonical contract per ADR-005: Firm=clerk_org_id TEXT (Clerk org_*), User=clerk_user_id TE...
@@ -354,8 +358,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (88)
+## context (89)
 
+- **[7] [DONE] DONE: INTAKE: Phase 1 global intents + Phase 1B contact capture + Phase 2 terminal off-ramps + returning-c** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: Phase 1 global intents + Phase 1B contact capture + Phase 2 terminal off-ramps + returning-caller reschedule flow + llm_contact hybrid mode + VAD/frustration/goodbye hardening + multi-tenant de...
+  _by user - 2026-07-16_
 - **[7] [DONE] DONE: INTAKE: xAI+Cartesia voice bridges production-grade, workflow coordination model established | outco** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xAI+Cartesia voice bridges production-grade, workflow coordination model established | outcome: xAI single-brain hosting+tool+force_message verified 40/40 tests; Cartesia compliant greeting+pri...
   _by user - 2026-07-15_
 - **[7] [DONE] DONE: INTAKE: Phase 1 global intents + Phase 1B contact-capture redesign | committed 895cc37 | outcome: 11** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: Phase 1 global intents + Phase 1B contact-capture redesign | committed 895cc37 | outcome: 11 fixes delivered (global intents: transfer/identity/frustration/goodbye + contact: first/last split, ...
