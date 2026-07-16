@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-16T08:54:37.155297+00:00
-- Total memories: 184
+- Generated: 2026-07-16T11:50:44.499720+00:00
+- Total memories: 186
 
-## High-importance decisions (8+, routine noise excluded) - 83
+## High-importance decisions (8+, routine noise excluded) - 84
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -158,6 +158,8 @@
   _by Admin - 2026-07-08 - tags: -_
 - **[8][decision] FM RLS canonical GUC + migration 010 staged** - Canonical RLS GUC for FM is app.current_tenant_id (set by app/core/database.py get_db_session). Migration 008 + compliance/001_rls_policies.sql wrongly use app.current_legal_entity_id (app never sets it). Staged migration 010_missing_tables_and_rls_fix creates approval_policy, reconciliation_adjustment_batch, treasury_sync_batch (had ORM models but no DDL anywhere) + tenant RLS, and fixes 008 treasury_bank_* RLS. Verified offline (py_compile + alembic history single head 009->010). NOT applied; DB down until 2026-06-26. Also fixed MockBillingAdapter NameError in ar billing_sync_routes.
   _by user - 2026-06-25 - tags: -_
+- **[8][pattern] workflow audit + Phase 3a complete** - Session delivered: (1) Workflow config audit: 20 issues across severity levels. Fixed 3 critical (wired transferring node, changed returning_client_check to phone_input, removed dead ask_permission_contact and reschedule_confirmation_sent). Fixed 4 high (trimmed 7 prompts under 250 chars, removed duplicate conflict_check branches, removed friend/brother false positive). Fixed 3 medium (awkward prompts for pl_jurisdiction, db_location_type, opi_jurisdiction). Added missing db_still_treatment, db_work_impact, pl_still_treatment, pl_work_impact nodes. (2) Phase 3a off-answer re-ask: jurisdiction nodes now detect off-target answers (minutes away, here, this city, I don't know) and re-ask with example. 54/54 pass. 123 nodes.
+  _by Admin - 2026-07-16 - tags: -_
 - **[8][pattern] WorkflowEngine global-intent layer (Phase 1)** - process_input now runs a single GLOBAL INTENTS block (turn>0) in locked priority: emergency -> transfer -> identity -> frustration -> ladder. New helpers: _detect_transfer_request (phrase-level w/ lawyer false-positive guard: suppresses 'I already have/hired an attorney','my brother is a lawyer'), _detect_identity_question (are you AI/human/robot, did you hire a human), _detect_frustration (not hearing me/didn't let me finish/keep asking). Identity+frustration re-ask current node via _build_reask_response (no advance). Frustration escape counter: 2 hits at same node -> escalate to callback. Redundant 2nd transfer/emergency block removed. 40/40 test_xai_cloud_bridge.py pass.
   _by Admin - 2026-07-14 - tags: -_
 - **[8][pattern] xai_cloud VQM + per-node VAD + latency payload** - xai_cloud bridge now uses shared VoiceQualityMonitor (app/services/voice/quality_monitor.py) like Dograh: start_session on bridge.start_session, WorkflowEvent+LatencyEvent(stage=workflow) per turn, LatencyEvent(stage=total) on first audio (TTFA), end_session builds report. Report saved to transcripts/{sid}-report.json with: metrics(connect_to_xai_ms, greeting_ttfa_ms, turn_ttfas_ms, avg), per-turn breakdown (workflow_ms=our-machine engine compute, ttfa_ms=total, transport_plus_provider_ms=ttfa-workflow=2 network hops+xAI STT/TTS overhead), vqm score, vqm_workflow_report. Per-node VAD: _vad_for_node() -> _VAD_STRUCTURED (2000ms silence) for email/phone/name nodes, _VAD_DEFAULT else; applied dynamically via session.update after each turn. Frontend app/web/xai_cloud_test.html rebuilt: End Call button, realtime event log w/ ms deltas, VQM tile, download report. TROUBLESHOOT FROM: transcripts/{sid}-report.json (authoritative, has node decisions); xAI playground logs only for STT/TTS fidelity cross-check.
@@ -268,8 +270,10 @@
 - **[6] LedgerPoster seam boundary: do not swap GL route CRUD** - journal_entry_routes.py posting/reversal/draft paths already use get_ledger_poster() (lines 59/185/259). The 6 remaining JournalEntryService(db) sites only use entry_repo/line_repo, bulk_upsert_lines, and _validate_required_dimensions, which the LedgerPoster Protocol intentionally excludes. Do NOT r...
   _by user - 2026-06-25_
 
-## pattern (4)
+## pattern (5)
 
+- **[8] workflow audit + Phase 3a complete** - Session delivered: (1) Workflow config audit: 20 issues across severity levels. Fixed 3 critical (wired transferring node, changed returning_client_check to phone_input, removed dead ask_permission_contact and reschedule_confirmation_sent). Fixed 4 high (trimmed 7 prompts under 250 chars, removed du...
+  _by Admin - 2026-07-16_
 - **[8] WorkflowEngine global-intent layer (Phase 1)** - process_input now runs a single GLOBAL INTENTS block (turn>0) in locked priority: emergency -> transfer -> identity -> frustration -> ladder. New helpers: _detect_transfer_request (phrase-level w/ lawyer false-positive guard: suppresses 'I already have/hired an attorney','my brother is a lawyer'), _...
   _by Admin - 2026-07-14_
 - **[8] xai_cloud VQM + per-node VAD + latency payload** - xai_cloud bridge now uses shared VoiceQualityMonitor (app/services/voice/quality_monitor.py) like Dograh: start_session on bridge.start_session, WorkflowEvent+LatencyEvent(stage=workflow) per turn, LatencyEvent(stage=total) on first audio (TTFA), end_session builds report. Report saved to transcript...
@@ -358,8 +362,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (89)
+## context (90)
 
+- **[7] [DONE] DONE: INTAKE: All three phases delivered. B=workflow audit (20 issues, 6 commits: critical routing fixes,** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: All three phases delivered. B=workflow audit (20 issues, 6 commits: critical routing fixes, prompt trimming, dead code removal, missing nodes, empathy preambles). A=off-answer re-ask (jurisdict...
+  _by user - 2026-07-16_
 - **[7] [DONE] DONE: INTAKE: Phase 1 global intents + Phase 1B contact capture + Phase 2 terminal off-ramps + returning-c** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: Phase 1 global intents + Phase 1B contact capture + Phase 2 terminal off-ramps + returning-caller reschedule flow + llm_contact hybrid mode + VAD/frustration/goodbye hardening + multi-tenant de...
   _by user - 2026-07-16_
 - **[7] [DONE] DONE: INTAKE: xAI+Cartesia voice bridges production-grade, workflow coordination model established | outco** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: xAI+Cartesia voice bridges production-grade, workflow coordination model established | outcome: xAI single-brain hosting+tool+force_message verified 40/40 tests; Cartesia compliant greeting+pri...
