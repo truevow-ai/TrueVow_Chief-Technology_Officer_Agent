@@ -3,8 +3,8 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-18T08:24:38.851704+00:00
-- Total memories: 190
+- Generated: 2026-07-18T08:30:25.276403+00:00
+- Total memories: 191
 
 ## High-importance decisions (8+, routine noise excluded) - 85
 
@@ -366,8 +366,10 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (93)
+## context (94)
 
+- **[7] [DONE] DONE: TRACE: verified DeepSeek LLM through full app stack | outcome: wired missing @app.get decorator on /** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "done", "status": "DONE", "message": "TRACE: verified DeepSeek LLM through full app stack | outcome: wired missing @app.get decorator on /llm-test in main.py, endpoint returns provider=deepseek_api response=WORKING via real API; 51/51 tests pass...
+  _by user - 2026-07-18_
 - **[7] [DONE] DONE: TRACE: switched billing LLM provider to DeepSeek API after Azure quota denial | outcome: LLM_SERVICE** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "done", "status": "DONE", "message": "TRACE: switched billing LLM provider to DeepSeek API after Azure quota denial | outcome: LLM_SERVICE_PROVIDER=deepseek_api in .env.local, live smoke test passed (deepseek-chat returned OK) | learned: DeepSee...
   _by user - 2026-07-18_
 - **[7] [ACTIVE] START: TRACE: switch billing LLM off Azure OpenAI (quota denied) | resuming from Azure quota rejection for** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "start", "status": "ACTIVE", "message": "TRACE: switch billing LLM off Azure OpenAI (quota denied) | resuming from Azure quota rejection for trace-gpt-5.4-mini | goal: DeepSeek API live as billing reconciliation backend", "timestamp": "2026-07-1...
