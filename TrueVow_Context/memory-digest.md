@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-16T11:50:44.499720+00:00
-- Total memories: 186
+- Generated: 2026-07-18T08:24:38.851704+00:00
+- Total memories: 190
 
-## High-importance decisions (8+, routine noise excluded) - 84
+## High-importance decisions (8+, routine noise excluded) - 85
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -152,6 +152,8 @@
   _by Admin - 2026-07-08 - tags: -_
 - **[8][bug] gitignore source-leak ECOSYSTEM AUDIT results (June 25) — which repos still affected** - Audited all sibling git repos for the gitignore source-leak (advisory 64bc43bf). NONE have run the fix yet (advisory just issued). CONFIRMED UNFIXED SOURCE LEAKS (real lib/ source hidden from git): TrueVow_Financial_Management_Service (frontend/lib + frontend/__tests__/lib), TrueVow_Tenant_Application_Service (app/portal/lib, dograh server ui/src/lib, scripts/lib), TrueVow-Tenant_Billing-Service (ui/lib; ALSO its .gitignore has an embedded NULL/control byte — corrupted). LATENT (dangerous unanchored lib/ rule present but no active source leak yet): TrueVow_Internal_Ops_Service, TrueVow_Tenant_SETTLE-Service, TrueVow_Tenant_LEVERAGE_Service. NOT GIT REPOS AT ALL (no version control — separate severe issue): TrueVow_Dialogflow_Intake_Service, TrueVow_Platform_Analytics_Service, TrueVow_Tenant_VERIFY_Service, TrueVow_TWIML_SoftPhone_App. CLEAN: Website, Customer_Success_CORE, First_Line_Support, Sales_Ops, Tenant_CONNECT, Customer_Portal, cartesia_test. SaaS_Admin already fixed. Each affected repo agent: run docs/01-main/ECOSYSTEM_ADVISORY_GITIGNORE_SOURCE_LEAK.md (in SaaS Admin).
   _by user - 2026-06-25 - tags: gitignore, audit, ecosystem, cross-service_
+- **[8][decision] TRACE billing LLM switched to DeepSeek API** - Azure denied quota increase for trace-gpt-5.4-mini deployment. Per user decision, LLM_SERVICE_PROVIDER=deepseek_api in .env.local. DeepSeekAPILLMService verified live (deepseek-chat responded OK, usage 10 tokens). CAUTION: DeepSeek public API has NO BAA - PHI-stripping rules mandatory per llm.py docstring; LLM_PHI_ALLOWED must stay false. Azure creds left in .env.local for potential rollback.
+  _by Admin - 2026-07-18 - tags: -_
 - **[8][decision] xai transfer is channel-aware (SIP-only real handoff)** - Per xAI SIP docs: a REAL warm transfer requires SIP call_id + POST /v1/realtime/calls/{id}/refer (tel:/sip: target). The cloud demo (WebSocket + agent_id + force_message) has NO call_id and NO refer path, so it CANNOT live-transfer. Compliance: a legal AI implying 'connecting you to an attorney now' when it can't is misrepresentation. Phase 1 _build_transfer_response = honest CALLBACK: acknowledge + route into contact capture (reuses sequence fix) + fire_transfer_notification. Response carries forward-compatible action='callback'/target_uri so a future SIP bridge can refer without engine changes.
   _by Admin - 2026-07-14 - tags: -_
 - **[8][decision] TRACE build decisions — storage pending Fly.io+Supabase spec amendment; billing recon uses temp fallback** - Resolved with product owner after reviewing revised TRACE-Technical-Implementation-Spec.md (1119 lines, 2026-07-08 11:02): (1) FLAG 1 STORAGE/AUDIT: The spec's [IMPLEMENTATION CHOICE] 'match your existing cloud' tables list only AWS/GCP/Azure, but verified TrueVow hosting is Fly.io + Docker + Supabase Postgres (fly.toml in Billing/SETTLE/TenantApp; aws-1-us-east-1.pooler.supabase.com; supabase>=2.0.0). No existing HIPAA-BAA object storage found. OWNER DECISION: owner will AMEND the spec's IMPLEMENTATION CHOICE tables to include Fly.io+Supabase before Phase 1A storage/audit is built. Phase 1A ON HOLD until amended spec lands. (2) FLAG 2 BILLING RECON: Verified FM/billing repos are corporate/SaaS finance (AR/AP/GL/treasury/payroll/intercompany + billing sync/webhook), NOT medical CPT/ICD-10. §5.6 premise 'billing repo owns CPT/ICD-10' is false for this codebase. OWNER DECISION: use the temporary spaCy CPT/ICD fallback from faxed BILLING docs, marked TODO, when §5.6 is eventually built (Phase 1D/4). (3) LOCKED: billing LLM = Azure OpenAI GPT-4o-mini; DeepSeek PROHIBITED any version (no BAA, China residency). (4) STILL BLOCKED: PRD §12 still lists 9 open questions, owner says 12 — awaiting updated PRD. Governance in force: locked-by-default, discretion only within [IMPLEMENTATION CHOICE], flag-and-wait, no unilateral resolution of §12.
@@ -283,7 +285,7 @@
 - **[6] xai_cloud bridge test suite** - Created tests/test_xai_cloud_bridge.py (34 tests) for XaiCloudBridge. Mirrors test_xai_bridge.py but adapts for cloud bridge: dual registration (xai_cloud + xai_cloud_voice_agent), default voice rex (male-only), end_session returns {bridge,session_id,status} without had_audio, double-start early-ret...
   _by Admin - 2026-07-08_
 
-## decision (20)
+## decision (21)
 
 - **[10] xai intake: filler+verbatim+routing all FIXED (test-1784019219932)** - Test test-1784019219932 confirmed 3 MAJOR fixes working: (1) FILLER GONE — clean 'silent function-calling component' console prompt (NO Benjamin persona, NO 'tool is the voice', guardrail block DELETED) + reasoning.effort:none + minimal function_call_output (status only, NOT the wording) = ENGINE te...
   _by Admin - 2026-07-14_
@@ -317,6 +319,8 @@
   _by Admin - 2026-07-03_
 - **[9] CONNECT Service Deleted** - TrueVow_Tenant_CONNECT_Service directory deleted. Removed from config.yaml services block and .gitignore. Was archived June 2026 — attorney referral network, no longer on TrueVow's agenda.
   _by user - 2026-07-01_
+- **[8] TRACE billing LLM switched to DeepSeek API** - Azure denied quota increase for trace-gpt-5.4-mini deployment. Per user decision, LLM_SERVICE_PROVIDER=deepseek_api in .env.local. DeepSeekAPILLMService verified live (deepseek-chat responded OK, usage 10 tokens). CAUTION: DeepSeek public API has NO BAA - PHI-stripping rules mandatory per llm.py doc...
+  _by Admin - 2026-07-18_
 - **[8] xai transfer is channel-aware (SIP-only real handoff)** - Per xAI SIP docs: a REAL warm transfer requires SIP call_id + POST /v1/realtime/calls/{id}/refer (tel:/sip: target). The cloud demo (WebSocket + agent_id + force_message) has NO call_id and NO refer path, so it CANNOT live-transfer. Compliance: a legal AI implying 'connecting you to an attorney now'...
   _by Admin - 2026-07-14_
 - **[8] TRACE build decisions — storage pending Fly.io+Supabase spec amendment; billing recon uses temp fallback** - Resolved with product owner after reviewing revised TRACE-Technical-Implementation-Spec.md (1119 lines, 2026-07-08 11:02): (1) FLAG 1 STORAGE/AUDIT: The spec's [IMPLEMENTATION CHOICE] 'match your existing cloud' tables list only AWS/GCP/Azure, but verified TrueVow hosting is Fly.io + Docker + Supaba...
@@ -362,8 +366,14 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (90)
+## context (93)
 
+- **[7] [DONE] DONE: TRACE: switched billing LLM provider to DeepSeek API after Azure quota denial | outcome: LLM_SERVICE** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "done", "status": "DONE", "message": "TRACE: switched billing LLM provider to DeepSeek API after Azure quota denial | outcome: LLM_SERVICE_PROVIDER=deepseek_api in .env.local, live smoke test passed (deepseek-chat returned OK) | learned: DeepSee...
+  _by user - 2026-07-18_
+- **[7] [ACTIVE] START: TRACE: switch billing LLM off Azure OpenAI (quota denied) | resuming from Azure quota rejection for** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "start", "status": "ACTIVE", "message": "TRACE: switch billing LLM off Azure OpenAI (quota denied) | resuming from Azure quota rejection for trace-gpt-5.4-mini | goal: DeepSeek API live as billing reconciliation backend", "timestamp": "2026-07-1...
+  _by user - 2026-07-18_
+- **[7] [ACTIVE] START: TRACE: research LLM provider alternatives to Azure OpenAI | resuming from Azure quota denial | goal:** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "start", "status": "ACTIVE", "message": "TRACE: research LLM provider alternatives to Azure OpenAI | resuming from Azure quota denial | goal: recommend viable provider with HIPAA/BAA support", "timestamp": "2026-07-18T04:52:02.094646+00:00", "wo...
+  _by user - 2026-07-18_
 - **[7] [DONE] DONE: INTAKE: All three phases delivered. B=workflow audit (20 issues, 6 commits: critical routing fixes,** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: All three phases delivered. B=workflow audit (20 issues, 6 commits: critical routing fixes, prompt trimming, dead code removal, missing nodes, empathy preambles). A=off-answer re-ask (jurisdict...
   _by user - 2026-07-16_
 - **[7] [DONE] DONE: INTAKE: Phase 1 global intents + Phase 1B contact capture + Phase 2 terminal off-ramps + returning-c** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "done", "status": "DONE", "message": "INTAKE: Phase 1 global intents + Phase 1B contact capture + Phase 2 terminal off-ramps + returning-caller reschedule flow + llm_contact hybrid mode + VAD/frustration/goodbye hardening + multi-tenant de...
