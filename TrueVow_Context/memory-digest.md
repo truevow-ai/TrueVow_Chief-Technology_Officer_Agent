@@ -3,10 +3,10 @@
 > AUTO-GENERATED from memory.db by `python TrueVow_Shared_Orchestration/memory.py export`.
 > Do NOT edit by hand - changes are overwritten. Source of truth: `TrueVow_Shared_Codebase_Memory/memory.db`.
 
-- Generated: 2026-07-18T08:30:25.276403+00:00
-- Total memories: 191
+- Generated: 2026-07-23T18:40:34.794966+00:00
+- Total memories: 196
 
-## High-importance decisions (8+, routine noise excluded) - 85
+## High-importance decisions (8+, routine noise excluded) - 86
 
 - **[10][architecture] SigNoz Deployed — Open-Source Observability Live** - SigNoz (open-source Datadog alternative) deployed as the TrueVow observability stack. Replaces the non-functional Sentry placeholder (# SENTRY_DSN=<add-your-dsn>). Stack: 5 Docker containers running (OTEL Collector on :4317/:4318, ClickHouse for traces/metrics, Query Service on :8080, Frontend UI on :3301, Jaeger fallback on :16686). All 11 services wired: setup.py --all copied otel_init.py / otel-node.js to each service, added OTEL_EXPORTER_OTLP_ENDPOINT to .env.local. Dashboard now shows OTEL wired: 11/11 and SigNoz: http://localhost:3301. Benefits: distributed tracing + metrics + error tracking all in one self-hosted platform, no API key needed.
   _by Admin - 2026-07-07 - tags: -_
@@ -34,6 +34,8 @@
   _by user - 2026-06-25 - tags: intake, voice-bridge, gemini, dograh, assemblyai, pipecat, xai, fsm, workflow, orchestration_
 - **[10][architecture] LEVERAGE (ex-DRAFT) — 3-Tier Rules Engine, NO AI** - LEVERAGE is a 3-tier legal rule validation system: TIER 1: State/Jurisdiction rules (mandatory, cannot be disabled). TIER 2: Practice Area rules (customizable). TIER 3: Firm/Attorney/Client-specific rules. CORE PRINCIPLE: NO AI — no machine learning, no neural networks, no LLM. Uses peer benchmarking (real firm data) and FSM engine analysis. Features: citation checking, server-side validation, customer portal UI (4 tabs: Validate, History, Rules, Downloads), SaaS Admin compliance reports (React), template browser. v2.0 with global templates from SaaS Admin + tenant-specific rules. 98.25% complete. Stack: Python/FastAPI + Next.js frontend. Was previously called DRAFT — fully renamed to LEVERAGE.
   _by user - 2026-06-25 - tags: leverage, rules-engine, no-ai, peer-benchmarking, fsm, 3-tier, citation, compliance_
+- **[10][bug] Fly auto-stop blocked by setInterval loops — unref() required** - CRITICAL: Four server-side setInterval timers in Sales Ops were preventing Fly.io auto-stop from working. The fly.toml had auto_stop_machines = true and min_machines_running = 0, but the machines ran 24/7 because Node.js event loop never drained. Root cause: setInterval creates a timer reference that Node counts as 'pending work'. Fly cannot suspend a machine whose process won't exit. The four offenders in Sales Ops: 1. Logger — 5s flush interval (lib/utils/logger.ts) 2. SecurityMonitor — 5s anomaly scan (lib/ai-agents/security/security-monitor.ts) 3. RateLimiter — 300s cleanup (lib/middleware/rate-limiter.ts) 4. HeartbeatTask — 300s registry heartbeat (lib/integrations/internal-ops-registry-client.ts) Fix: Add .unref() to every setInterval call on the server side. This tells Node 'don't consider this timer as keeping the process alive.' The interval still fires while the process is running, but when Fly determines the machine is idle and sends SIGTERM, the process can exit cleanly. Pattern: const interval = setInterval(() => { ... }, ms); interval.unref(); AUDIT CHECKLIST for every other TrueVow service deployed on fly.io: 1. Search for ALL setInterval calls in server-side code (not browser/client components) 2. Every one that doesn't already have .unref() MUST get it 3. Pay special attention to: loggers, monitoring loops, health-check pings, cleanup tasks, heartbeat tasks, polling loops 4. Also check: email-verifier/reacher-truevow had NO auto_stop_machines config at all in its fly.toml — it ran 24/7. All fly.toml files need auto_stop_machines = true, auto_start_machines = true, min_machines_running = 0 5. Verify: deploy, wait 10 minutes with no traffic, check 'fly status' — machine should show 'stopped' Estimated cost impact if unfixed: ~/machine/month for shared-cpu VMs running 24/7 vs ~-5/month with auto-stop.
+  _by Admin - 2026-07-23 - tags: -_
 - **[10][bug] settle_verdicts table never existed + bulk_insert had no validation** - CRITICAL for a legal-data product: (1) settle_verdicts + settle_verdict_scrape_jobs tables were never migrated - all prior loads 404'd, zero data persisted. (2) app/services/verdict_search.py bulk_insert_verdicts inserts raw dicts with NO validation. (3) scraped enrichment vocab did NOT match DB enums: outcome_type(damages/award/verdict/unspecified vs verdict_plaintiff/defense/settlement/dismissed), liability_tier, plaintiff_age_range, defendant_industry all mismatched; dates were prose not ISO. Fix: verdict_validator.py gate + alembic migration d5e6f7a8b9c0 with CHECK constraints. Loaded 18841 rows. Also batch_load_all globbed base files not *_enriched - would have discarded all enrichment.
   _by Admin - 2026-07-09 - tags: -_
 - **[10][bug] Sentry DSN Placeholder — Dashboard Lied** - Dashboard previously reported 'Observability: RUNNING' implying Sentry was active. In reality, shared-libraries/sentry/setup-python.py writes # SENTRY_DSN=<add-your-dsn> — a commented placeholder — to every service's .env.local. The Sentry SDK is installed but no real DSN means zero error tracking ecosystem-wide. Fixed: dashboard now scans all 13 services for real DSN values and reports 'MISSING (no real DSN in any service)'. To enable: create a Sentry project, get a DSN, and set SENTRY_DSN=<real-value> in each service's .env.local.
@@ -335,8 +337,10 @@
 - **[10] zero hardcoded tunable values** - RULE: This is a multi-tenant platform. Never hardcode ANY value that may need adjustment per-tenant, per-firm, or per-environment. All tunables must live in one of: (1) tenant_config, (2) workflow JSON config, or (3) named module-level constants with clear documentation. Bare numbers, strings, or ID...
   _by Admin - 2026-07-15_
 
-## bug (14)
+## bug (15)
 
+- **[10] Fly auto-stop blocked by setInterval loops — unref() required** - CRITICAL: Four server-side setInterval timers in Sales Ops were preventing Fly.io auto-stop from working. The fly.toml had auto_stop_machines = true and min_machines_running = 0, but the machines ran 24/7 because Node.js event loop never drained. Root cause: setInterval creates a timer reference tha...
+  _by Admin - 2026-07-23_
 - **[10] settle_verdicts table never existed + bulk_insert had no validation** - CRITICAL for a legal-data product: (1) settle_verdicts + settle_verdict_scrape_jobs tables were never migrated - all prior loads 404'd, zero data persisted. (2) app/services/verdict_search.py bulk_insert_verdicts inserts raw dicts with NO validation. (3) scraped enrichment vocab did NOT match DB enu...
   _by Admin - 2026-07-09_
 - **[10] Sentry DSN Placeholder — Dashboard Lied** - Dashboard previously reported 'Observability: RUNNING' implying Sentry was active. In reality, shared-libraries/sentry/setup-python.py writes # SENTRY_DSN=<add-your-dsn> — a commented placeholder — to every service's .env.local. The Sentry SDK is installed but no real DSN means zero error tracking e...
@@ -366,8 +370,14 @@
 - **[1] FIXED: gitignore source-leak advisory** - RESOLVED July 1. All 6 affected services fixed.
   _by user - 2026-07-01_
 
-## context (94)
+## context (98)
 
+- **[8] Git Scan: 2026-07-21T17:26:34** - { "summary": { "timestamp": "2026-07-21T17:26:34.837888+00:00", "total": 14, "clean": 0, "dirty": 13, "missing": 1, "errors": 0, "stale_services": 14, "active_services": 0, "status_breakdown": { "HEALTHY": 0, "ACTIVE": 0, "STALE": 1, "NEGLECTED": 13, "BLOCKED": 0, "FAILING": 0, "INCIDENT": 0, "DIRTY...
+  _by Admin - 2026-07-21_
+- **[7] [ACTIVE] START: Sales Ops: updated SANIA_DEVELOPER_GUIDE.md with full system overview (pipeline state, changes since** - {"agent_id": "TrueVow_Sales_Ops_Service", "action": "start", "status": "ACTIVE", "message": "Sales Ops: updated SANIA_DEVELOPER_GUIDE.md with full system overview (pipeline state, changes since June 5, active blockers) | goal: brief readable system doc for Sania", "timestamp": "2026-07-21T18:22:28.8...
+  _by user - 2026-07-21_
+- **[7] [ACTIVE] START: PATCH: AGENTS.md — NEVER FABRICATE rule added (origin: LiveKit agent 429-to-billing-limit fabricatio** - {"agent_id": "TrueVow_Tenant_Application_Service", "action": "start", "status": "ACTIVE", "message": "PATCH: AGENTS.md \u2014 NEVER FABRICATE rule added (origin: LiveKit agent 429-to-billing-limit fabrication, 2026-07-19) | outcome: rule codified with verification protocol + user- correction procedu...
+  _by user - 2026-07-19_
 - **[7] [DONE] DONE: TRACE: verified DeepSeek LLM through full app stack | outcome: wired missing @app.get decorator on /** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "done", "status": "DONE", "message": "TRACE: verified DeepSeek LLM through full app stack | outcome: wired missing @app.get decorator on /llm-test in main.py, endpoint returns provider=deepseek_api response=WORKING via real API; 51/51 tests pass...
   _by user - 2026-07-18_
 - **[7] [DONE] DONE: TRACE: switched billing LLM provider to DeepSeek API after Azure quota denial | outcome: LLM_SERVICE** - {"agent_id": "TrueVow_Tenant_TRACE_Service", "action": "done", "status": "DONE", "message": "TRACE: switched billing LLM provider to DeepSeek API after Azure quota denial | outcome: LLM_SERVICE_PROVIDER=deepseek_api in .env.local, live smoke test passed (deepseek-chat returned OK) | learned: DeepSee...
@@ -438,6 +448,8 @@
   _by user - 2026-06-25_
 - **[6] Documentation Status: TrueVow_Documentation is Stale** - TrueVow_Documentation/ contains older documentation (Word docs, markdown exports) including TrueVow_PRD.md, Complete System Technical Documentation, Financial Management guides, and Billing Service updates. These are outdated - they reflect the old architecture with DRAFT naming, CONNECT active, and...
   _by user - 2026-06-25_
+- **[5] Sania Dev Guide Rewritten** - Replaced SANIA_DEVELOPER_GUIDE.md with comprehensive but scannable system overview: 8-phase pipeline table, 5 factories with detailed user journeys, inter-factory handoff diagram, current pipeline state per-state, changes since June 5, quick reference.
+  _by Admin - 2026-07-21_
 - **[5] [ACTIVE] BLOCKED: SETTLE: bridging 12444 verified verdicts into estimator | attempted: built bridge_verdicts_to_estima** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "blocked", "status": "ACTIVE", "message": "SETTLE: bridging 12444 verified verdicts into estimator | attempted: built bridge_verdicts_to_estimator.py (label-only enum mapping, exact_outcome_amount verbatim, evidence preserved, reversible) - dry...
   _by user - 2026-07-11_
 - **[5] [ACTIVE] BLOCKED: SETTLE: scaled Exa carrier+age enrichment blocked | attempted: built crash-safe resumable runner (pe** - {"agent_id": "TrueVow_Tenant_SETTLE-Service", "action": "blocked", "status": "ACTIVE", "message": "SETTLE: scaled Exa carrier+age enrichment blocked | attempted: built crash-safe resumable runner (per-row checkpoint+heartbeat), scoped to carriers+ages only, launched top-8 states | blocker: Exa API H...
